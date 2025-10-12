@@ -1,0 +1,81 @@
+/* Global font */
+:root {
+  --base-font-size: 16px; /* default, can be changed dynamically */
+}
+
+body {
+  font-family: 'Century Gothic', 'AppleGothic', 'Arial', sans-serif;
+  font-size: var(--base-font-size);
+  margin: 0;
+  padding: 0;
+}
+.custom-nav-item {
+  display: block;          /* makes full width clickable */
+  width: 100%;             /* match parent width */
+  padding: 8px 16px;       /* padding same as other nav items */
+  margin: 0;
+  border-radius: 4px;      /* rounded corners to match design */
+  transition: background-color 0.2s ease;
+}
+
+.custom-nav-item:hover {
+  background-color: rgba(255, 255, 255, 0.05); /* subtle hover background */
+}
+
+.custom-nav-item.selected {
+  background-color: #007bff; /* blue background when selected */
+  color: white;
+  font-weight: 600;
+}
+
+.custom-nav-item.selected span {
+  color: white;  /* dot color changes on selected */
+}
+
+
+/* Headings inherit font size */
+h1, h2, h3, h4, h5, h6 {
+  font-size: inherit;
+}
+
+/* Display styles */
+.display-1, .display-2, .display-3, .display-4 {
+  font-size: 1.25rem !important;
+}
+
+/* Common UI elements */
+.card, .card-body, .card-header,
+.form-control, p, span, td, th {
+  font-size: 0.8rem !important;
+}
+
+/* Sidebar customization */
+.custom-sidebar .nav-link::before,
+.custom-sidebar .nav-item::before {
+  content: none !important;
+}
+
+.custom-sidebar .nav-item {
+  padding-left: 0 !important;
+}
+
+.custom-sidebar .nav-title {
+  font-size: 0.8rem;
+}
+
+.custom-sidebar .nav-link {
+  list-style: none;
+}
+
+.nav-group .nav-item {
+  list-style-type: none !important;
+  padding-left: 0 !important;
+}
+
+.gateway-nav-item {
+  list-style-type: none !important;
+}
+
+.gateway-nav-item::before {
+  content: none !important;
+}
