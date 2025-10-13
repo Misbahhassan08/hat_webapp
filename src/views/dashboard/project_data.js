@@ -178,7 +178,7 @@ const ProjectData = () => {
     const fetchGatewayData = async () => {
       try {
       const response = await axios.get(
-        `http://127.0.0.1:8000/getgateway/?gateway_id=12&mac=12:04:05:30:40:53`
+        "https://hat-server-382170497486.us-central1.run.app/getgateway/?gateway_id=12&mac=12:04:05:30:40:53"
       );
 
         console.log("api response:", response.data);
