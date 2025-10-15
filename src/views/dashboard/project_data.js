@@ -1,53 +1,64 @@
 import React, { useEffect, useState } from "react";
 import {
-  Box, Table, TableBody, TableCell, TableContainer, TableHead, TableRow,
-  Paper, Typography, TextField,Card, CardContent, Link, IconButton
+  Box,
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TableRow,
+  Paper,
+  Typography,
+  TextField,
+  Card,
+  CardContent,
+  Link,
+  IconButton
 } from "@mui/material";
 import { useNavigate } from "react-router-dom";
 import axios from "axios";
 import dayjs from "dayjs";
 import { useTheme } from "@mui/material/styles";
-import { Devices, CloudUpload, DynamicFeed, Error } from "@mui/icons-material";
-
-import urls from "../../urls/urls";
-import ProjectDataCard from "../widgets/project_data_card";
-import ProjectValueCard from "../widgets/project_value_card";
-import projecticon from "../../assets/images/projecticon.svg";
-import ProjectChart from "./PMGraphs/ProjectChart";
-import DeployGateway from "./DeployGateway";
+import { X } from "lucide-react";
+import { House } from "lucide-react";
 import GoogleMapReact from "google-map-react";
-import { House,X } from "lucide-react";
+import urls from "../../urls/urls";
+import DeployGateway from "./DeployGateway";
 
 
-const HouseMarker = ({ text, alertStatus, warningStatus, arm, gatewayData }) => {
+// 🔹 HouseMarker Component
+const HouseMarker = ({ text, alertStatus, warningStatus, gatewayData }) => {
   const [showPopup, setShowPopup] = useState(false);
-  const [address, setAddress] = useState("");
+  const [location, setLocation] = useState("");
+  const [houseNumber, setHouseNumber] = useState("");
 
   let color = "green";
-  if (alertStatus === "1" || alertStatus === 1) {
-    color = "red";
-  } else if (warningStatus === "1" || warningStatus === 1) {
-    color = "orange";
-  }
-console.log("alertStatus:", alertStatus, "warningStatus:", warningStatus, "color:", color);
-  
+  if (alertStatus === "1" || alertStatus === 1) color = "red";
+  else if (warningStatus === "1" || warningStatus === 1) color = "orange";
 
-  //  Fetch address from OpenStreetMap
+  // 🔹 Fetch address from OpenStreetMap
   useEffect(() => {
     if (gatewayData?.Lat_Log) {
-      const [lng, lat] = gatewayData.Lat_Log; 
+      const [lat, lng] = gatewayData.Lat_Log;
+
       axios
         .get(
           `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json`
         )
         .then((res) => {
-          setAddress(res.data.display_name);
+          const data = res.data;
+          setLocation(data.display_name || "Location not found");
+
+          // Extract house number if available
+          const house = data.address?.house_number || data.address?.building || "";
+          setHouseNumber(house);
         })
-        .catch(() => setAddress("Address not found"));
+        .catch(() => {
+          setLocation("Location not found");
+          setHouseNumber("");
+        });
     }
   }, [gatewayData]);
-
-
 
   return (
     <div
@@ -57,7 +68,7 @@ console.log("alertStatus:", alertStatus, "warningStatus:", warningStatus, "color
         position: "relative",
       }}
     >
-      {/* Marker Icon */}
+      {/* 🏠 House Icon */}
       <div onClick={() => setShowPopup(!showPopup)} style={{ cursor: "pointer" }}>
         <House
           size={32}
@@ -76,12 +87,12 @@ console.log("alertStatus:", alertStatus, "warningStatus:", warningStatus, "color
         </div>
       </div>
 
-      {/* Popup Info Card */}
+      {/* 🧾 Popup Info */}
       {showPopup && (
         <Card
           sx={{
             position: "absolute",
-            top: "-200px",
+            top: "-240px",
             left: "50%",
             transform: "translateX(-50%)",
             width: 280,
@@ -105,25 +116,30 @@ console.log("alertStatus:", alertStatus, "warningStatus:", warningStatus, "color
               {gatewayData?.gateway_name || "Gateway"}
             </Typography>
 
-            {/*  Address from reverse geocoding */}
-            <Typography variant="body2">
-              {address || "Fetching address..."}
+            {/* ✅ House Number */}
+            <Typography variant="body2" fontWeight={600}>
+              🏠 House: {gatewayData?.address || houseNumber || "Not available"}
             </Typography>
 
-            <Typography variant="body2" color="text.secondary">
+            {/* ✅ Full Location */}
+            <Typography variant="body2" sx={{ mt: 1 }}>
+              📍 Location: {location}
+            </Typography>
+
+            <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
               MAC: {gatewayData?.gateway_mac}
             </Typography>
 
             <Typography variant="body2">
-               Status:{" "}
-      {alertStatus === "1" || alertStatus === 1
-    ? "🚨 Alert"
-    : warningStatus === "1" || warningStatus === 1
-    ? "⚠️ Warning"
-    : "✅ Normal"}
+              Status:{" "}
+              {alertStatus === "1" || alertStatus === 1
+                ? "🚨 Alert"
+                : warningStatus === "1" || warningStatus === 1
+                ? "⚠️ Warning"
+                : "✅ Normal"}
             </Typography>
 
-            {/* Google Maps link */}
+            {/* Google Maps Link */}
             {gatewayData?.Lat_Log && (
               <Link
                 href={`https://www.google.com/maps?q=${gatewayData.Lat_Log[1]},${gatewayData.Lat_Log[0]}`}
@@ -132,7 +148,7 @@ console.log("alertStatus:", alertStatus, "warningStatus:", warningStatus, "color
                 underline="hover"
                 sx={{ display: "block", mt: 1 }}
               >
-                View on Google Maps
+                🌍 View on Google Maps
               </Link>
             )}
           </CardContent>
@@ -143,8 +159,7 @@ console.log("alertStatus:", alertStatus, "warningStatus:", warningStatus, "color
 };
 
 
-
-
+// 🔹 ProjectData Component
 const ProjectData = () => {
   const theme = useTheme();
   const navigate = useNavigate();
@@ -154,7 +169,7 @@ const ProjectData = () => {
   const [role, setRole] = useState("");
   const [gatewayData, setGatewayData] = useState(null);
 
-
+  // Default map position
   const defaultProps = {
     center: {
       lat: 24.840,
@@ -163,7 +178,7 @@ const ProjectData = () => {
     zoom: 6
   };
 
-  // Load user info from localStorage
+  // Load user info
   useEffect(() => {
     const storedUser = JSON.parse(localStorage.getItem("user"));
     if (storedUser) {
@@ -172,38 +187,38 @@ const ProjectData = () => {
     }
   }, []);
 
+  // 🔹 Fetch Gateway Data Every 5 Seconds
+  useEffect(() => {
+    let intervalId;
 
-
-    useEffect(() => {
     const fetchGatewayData = async () => {
       try {
-      const response = await axios.get(
-        `https://hat-server-382170497486.us-central1.run.app/getgateway/?gateway_id=12&mac=12:04:05:30:40:53`
-      );
+        const response = await axios.get(
+          `https://hat-server-382170497486.us-central1.run.app/getgateway/?gateway_id=12&mac=12:04:05:30:40:53`
+        );
 
-        console.log("api response:", response.data);
         setGatewayData(response.data);
-         console.log("Gateway ID:", response.data.G_id || response.data.gateway_id);
-
+        console.log("Updated gateway data:", response.data);
       } catch (error) {
         console.error("Error fetching single gateway:", error);
       }
     };
 
     fetchGatewayData();
+    intervalId = setInterval(fetchGatewayData, 5000);
+    return () => clearInterval(intervalId);
   }, []);
 
-  // Fetch connected gateways
+  // 🔹 Fetch all connected gateways
   useEffect(() => {
     if (!userId && role !== "admin") return;
 
     const fetchGateways = async () => {
       try {
         let response;
-
         if (role === "admin" || role === "superadmin") {
           response = await axios.get(urls.getAllGateways);
-          console.log("Gateway API Response:admin", response.data);
+          console.log("Gateway API Response (admin):", response.data);
         } else {
           response = await axios.get(`${urls.getUserGateways}?user_id=${userId}`);
           console.log("Gateway API Response:", response.data);
@@ -223,7 +238,7 @@ const ProjectData = () => {
     fetchGateways();
   }, [userId, role]);
 
-  // Navigate to specific gateway dashboard
+  // Navigate to project manager
   const handleGatewayClick = (gateway) => {
     navigate("/dashboard/project_manager", { state: { gateway } });
   };
@@ -231,7 +246,14 @@ const ProjectData = () => {
   return (
     <Box p={2}>
       {/* Header */}
-      <Box sx={{ mb: 3, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+      <Box
+        sx={{
+          mb: 3,
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+        }}
+      >
         <Box>
           <Typography variant="h4" fontWeight={700}>Dashboard</Typography>
           <Typography variant="body1" fontWeight={700}>
@@ -253,12 +275,15 @@ const ProjectData = () => {
             mb: 2,
             p: "10px",
             borderRadius: "8px",
-            background: theme.palette.mode === "dark"
-              ? "#2B344A"
-              : "linear-gradient(90deg, #5EACED 0%, #4089CA 100%)"
+            background:
+              theme.palette.mode === "dark"
+                ? "#2B344A"
+                : "linear-gradient(90deg, #5EACED 0%, #4089CA 100%)",
           }}
         >
-          <Typography variant="h5" fontWeight={700} color="#fff">Connected Gateways</Typography>
+          <Typography variant="h5" fontWeight={700} color="#fff">
+            Connected Gateways
+          </Typography>
           <TextField
             placeholder="Search"
             size="small"
@@ -267,33 +292,31 @@ const ProjectData = () => {
           {role && (role === "user" || role === "admin") && <DeployGateway />}
         </Box>
 
-    {/* Map only for admin */}
-{role === "admin" && gatewayData && (
-  <div style={{ height: "500px", width: "100%", marginTop: "20px" }}>
-    <GoogleMapReact
-      bootstrapURLKeys={{ key: "AIzaSyAcp45sEfXq6mT19p51_LC8Goiv4ztUDnQ" }}
-      defaultCenter={{
-        lat: parseFloat(gatewayData.Lat_Log[0]), // latitude
-        lng: parseFloat(gatewayData.Lat_Log[1]), // longitude
-      }}
-      defaultZoom={8}
-    >
-      <HouseMarker
-        lat={parseFloat(gatewayData.Lat_Log[0])}
-        lng={parseFloat(gatewayData.Lat_Log[1])}
-        text="My Location"
-        alertStatus={gatewayData.alert_status}
-        warningStatus={gatewayData.warning_status}
-        arm={gatewayData.arm}
-        gatewayData={gatewayData}
-      />
-    </GoogleMapReact>
-  </div>
-)}
+        {/* 🔹 Map (for Admin) */}
+        {role === "admin" && gatewayData && (
+          <div style={{ height: "500px", width: "100%", marginTop: "20px" }}>
+            <GoogleMapReact
+              bootstrapURLKeys={{ key: "AIzaSyAcp45sEfXq6mT19p51_LC8Goiv4ztUDnQ" }}
+              center={{
+                lat: parseFloat(gatewayData.Lat_Log[0]),
+                lng: parseFloat(gatewayData.Lat_Log[1]),
+              }}
+              zoom={8}
+            >
+              <HouseMarker
+                lat={parseFloat(gatewayData.Lat_Log[0])}
+                lng={parseFloat(gatewayData.Lat_Log[1])}
+                text={gatewayData.gateway_name || "My Gateway"}
+                alertStatus={gatewayData.alert_status}
+                warningStatus={gatewayData.warning_status}
+                gatewayData={gatewayData}
+              />
+            </GoogleMapReact>
+          </div>
+        )}
 
-
-
-        <TableContainer component={Paper}>
+        {/* 🔹 Gateway Table */}
+        <TableContainer component={Paper} sx={{ mt: 3 }}>
           <Table>
             <TableHead>
               <TableRow sx={{ background: "#E8EAF6" }}>
@@ -316,7 +339,7 @@ const ProjectData = () => {
                   <TableCell>{gateway.G_id}</TableCell>
                   <TableCell>{gateway.gateway_name}</TableCell>
                   <TableCell>{gateway.mac_address}</TableCell>
-                  <TableCell>{gateway.status ? "Offline" : "online"}</TableCell>
+                  <TableCell>{gateway.status ? "Offline" : "Online"}</TableCell>
                   <TableCell>{gateway.deploy_status}</TableCell>
                   <TableCell>{gateway.config ? "Not Configured" : "Configured"}</TableCell>
                 </TableRow>
@@ -333,9 +356,6 @@ const ProjectData = () => {
           </Table>
         </TableContainer>
       </Box>
-
-
-
     </Box>
   );
 };

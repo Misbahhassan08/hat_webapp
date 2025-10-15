@@ -29,6 +29,12 @@ const ProjectManager = () => {
     };
 
     fetchGatewayData();
+
+      // Set interval to fetch every 5 seconds
+  const interval = setInterval(fetchGatewayData, 5000);
+
+  // Cleanup interval when component unmounts or gateway_id changes
+  return () => clearInterval(interval);
   }, [gateway_id]);
 
   if (!gatewayData) {
@@ -129,11 +135,12 @@ const ProjectManager = () => {
                   style={{
                     padding: "10px",
                     fontWeight: 600,
-                    color: sensor.enabled ? "green" : "red",
+                    color: sensor.status === "1" ? "green" : "red",
                   }}
                 >
-                  {sensor.enabled ? "Active" : "Alert"}
+                  {sensor.status === "1" ? "Active" : "Alert"}
                 </td>
+
               <td style={{ padding: "10px" }}>
   <img
     src={sensor.image_url}   
