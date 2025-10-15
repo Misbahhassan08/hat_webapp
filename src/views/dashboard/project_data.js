@@ -157,8 +157,8 @@ const ProjectData = () => {
 
   const defaultProps = {
     center: {
-      lat: 31.5497,
-      lng: 74.3436
+      lat: 24.840,
+      lng: 67.159
     },
     zoom: 6
   };
@@ -178,7 +178,7 @@ const ProjectData = () => {
     const fetchGatewayData = async () => {
       try {
       const response = await axios.get(
-        "https://hat-server-382170497486.us-central1.run.app/getgateway/?gateway_id=12&mac=12:04:05:30:40:53"
+        `https://hat-server-382170497486.us-central1.run.app/getgateway/?gateway_id=12&mac=12:04:05:30:40:53`
       );
 
         console.log("api response:", response.data);
@@ -273,14 +273,14 @@ const ProjectData = () => {
     <GoogleMapReact
       bootstrapURLKeys={{ key: "AIzaSyAcp45sEfXq6mT19p51_LC8Goiv4ztUDnQ" }}
       defaultCenter={{
-        lat: parseFloat(gatewayData.Lat_Log[1]), // latitude
-        lng: parseFloat(gatewayData.Lat_Log[0]), // longitude
+        lat: parseFloat(gatewayData.Lat_Log[0]), // latitude
+        lng: parseFloat(gatewayData.Lat_Log[1]), // longitude
       }}
       defaultZoom={8}
     >
       <HouseMarker
-        lat={parseFloat(gatewayData.Lat_Log[1])}
-        lng={parseFloat(gatewayData.Lat_Log[0])}
+        lat={parseFloat(gatewayData.Lat_Log[0])}
+        lng={parseFloat(gatewayData.Lat_Log[1])}
         text="My Location"
         alertStatus={gatewayData.alert_status}
         warningStatus={gatewayData.warning_status}
@@ -316,9 +316,9 @@ const ProjectData = () => {
                   <TableCell>{gateway.G_id}</TableCell>
                   <TableCell>{gateway.gateway_name}</TableCell>
                   <TableCell>{gateway.mac_address}</TableCell>
-                  <TableCell>{gateway.status ? "Online" : "Offline"}</TableCell>
+                  <TableCell>{gateway.status ? "Offline" : "online"}</TableCell>
                   <TableCell>{gateway.deploy_status}</TableCell>
-                  <TableCell>{gateway.config ? "Configured" : "Not Configured"}</TableCell>
+                  <TableCell>{gateway.config ? "Not Configured" : "Configured"}</TableCell>
                 </TableRow>
               ))}
 

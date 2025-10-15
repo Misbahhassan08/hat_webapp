@@ -264,7 +264,7 @@ const getFilteredNav = () => {
       
           }}>
 
-            <Typography variant='subtitle1' sx={{fontWeight: '700'}}>Welcome to IES</Typography>
+            <Typography variant='subtitle1' sx={{fontWeight: '700'}}>Welcome to</Typography>
           </div>
 
           <div style={{
