@@ -9,7 +9,6 @@ const API_Base_url = import.meta.env.VITE_API_BASE_URL || "http://192.168.18.28:
 //const API_Base_url = import.meta.env.VITE_API_BASE_URL || "https://ems-server-530056698.us-central1.run.app" ;
 //server url "https://ems-server-530056698.us-central1.run.app"
 
-
 const urls = {
   getUserProjects: () => `${API_Base_url}/get_project_manager/${getUserIdFromLocalStorage()}/`, // Uses helper
   checkLastUpdate: `${API_Base_url}/check_last_update/`,
