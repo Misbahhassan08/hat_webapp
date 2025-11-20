@@ -34,18 +34,20 @@ const CreateUser = () => {
   const userId = receivedUser?.id;
   const gateways = userData?.userGateways || []
   const assignGateway = urls.assignGateway
-   const [role, setRole] = useState('');
+  const [role, setRole] = useState('');
+  const [image, setImage] = useState("");
+  console.log("uploaded image", image);
 
-  
-  
-    
-    useEffect(() => {
-      // Retrieve user data from localStorage
-      const user = JSON.parse(localStorage.getItem('user'));
-      if (user) {
-        setRole(user.role || ''); // Set role from localStorage
-      }
-    }, []);
+
+
+
+  useEffect(() => {
+    // Retrieve user data from localStorage
+    const user = JSON.parse(localStorage.getItem('user'));
+    if (user) {
+      setRole(user.role || ''); // Set role from localStorage
+    }
+  }, []);
 
 
   const [formData, setFormData] = useState({
@@ -59,7 +61,7 @@ const CreateUser = () => {
     adress: '',
     image: '',
     is_online: false,
-    user_id:'',
+    user_id: '',
   });
 
   const [selectedImage, setSelectedImage] = useState(null);
@@ -69,8 +71,8 @@ const CreateUser = () => {
   const [selectedGatewaysList, setSelectedGatewaysList] = useState([]);
   const [assignedGateways, setAssignedGateways] = useState([]);
   const [loading, setLoading] = useState(false);
-    const [errors, setErrors] = useState({});
-  
+  const [errors, setErrors] = useState({});
+
 
   useEffect(() => {
     if (isEditMode) {
@@ -79,7 +81,7 @@ const CreateUser = () => {
         lastname: receivedUser.lastname || '',
         email: receivedUser.email || '',
         contact: receivedUser.contact || '',
-        password:receivedUser.password || '',
+        password: receivedUser.password || '',
         role: receivedUser.role || 'user',
         zip_code: receivedUser.zip_code || '',
         adress: receivedUser.address || '',
@@ -93,60 +95,130 @@ const CreateUser = () => {
     }
   }, [location.state]);
 
-  
 
-useEffect(() => {
-  const fetchUnassignedGateway = async () => {
-    try {
-      const userId = localStorage.getItem('user_id'); // Or use getUserIdFromLocalStorage()
-      const response = await axios.get(urls.unassignedGateway);
 
-      // Filter gateways by created_by_id
-      const filteredGateways = (response.data.UnassignedGateways ?? []).filter(
-        (gateway) => String(gateway.created_by_id) === String(getUserIdFromLocalStorage())
-      );
+  useEffect(() => {
+    const fetchUnassignedGateway = async () => {
+      try {
+        const userId = localStorage.getItem('user_id'); // Or use getUserIdFromLocalStorage()
+        const response = await axios.get(urls.unassignedGateway);
 
-      setUnassignedGateway(filteredGateways);
-    } catch (error) {
-      console.error('Error fetching Unassigned Gateways:', error);
-      setUnassignedGateway([]);
+        // Filter gateways by created_by_id
+        const filteredGateways = (response.data.UnassignedGateways ?? []).filter(
+          (gateway) => String(gateway.created_by_id) === String(getUserIdFromLocalStorage())
+        );
+
+        setUnassignedGateway(filteredGateways);
+      } catch (error) {
+        console.error('Error fetching Unassigned Gateways:', error);
+        setUnassignedGateway([]);
+      }
+    };
+
+    fetchUnassignedGateway();
+    const intervalId = setInterval(fetchUnassignedGateway, 5000);
+    return () => clearInterval(intervalId);
+  }, []);
+
+
+  const handleChange = (e) => {
+    const { name, value } = e.target;
+
+    if (name === 'contact') {
+      // Remove non-numeric characters except dash
+      let cleaned = value.replace(/[^\d]/g, '');
+
+      // Limit to 11 digits
+      if (cleaned.length > 11) cleaned = cleaned.slice(0, 11);
+
+      // Add dash after 4 digits if at least 5 digits are entered
+      if (cleaned.length > 4) {
+        cleaned = cleaned.slice(0, 4) + '-' + cleaned.slice(4);
+      }
+
+      setFormData({ ...formData, [name]: cleaned });
+    } else {
+      setFormData({ ...formData, [name]: value });
     }
   };
 
-  fetchUnassignedGateway();
-  const intervalId = setInterval(fetchUnassignedGateway, 5000);
-  return () => clearInterval(intervalId);
-}, []);
-
-
-const handleChange = (e) => {
-  const { name, value } = e.target;
-
-  if (name === 'contact') {
-    // Remove non-numeric characters except dash
-    let cleaned = value.replace(/[^\d]/g, '');
-
-    // Limit to 11 digits
-    if (cleaned.length > 11) cleaned = cleaned.slice(0, 11);
-
-    // Add dash after 4 digits if at least 5 digits are entered
-    if (cleaned.length > 4) {
-      cleaned = cleaned.slice(0, 4) + '-' + cleaned.slice(4);
-    }
-
-    setFormData({ ...formData, [name]: cleaned });
-  } else {
-    setFormData({ ...formData, [name]: value });
-  }
-};
-
+  // 🖼️ Handle upload OR update
   const handleImageUpload = async (event) => {
     const file = event.target.files[0];
     if (!file) return;
 
-    setSelectedFile(file);
     const preview = URL.createObjectURL(file);
     setSelectedImage(preview);
+
+    try {
+      let response;
+
+      // Extract public_id if editing existing user
+      const match = formData.image?.match(/upload\/(.*?)\./);
+      const publicId = match ? `uploads/${match[1]}` : null;
+
+      if (isEditMode && publicId) {
+        console.log("🪶 Updating existing image with public_id:", publicId);
+        const formDataObj = new FormData();
+        formDataObj.append("public_id", publicId);
+        formDataObj.append("image", file);
+
+        response = await axios.post(urls.updateImage, formDataObj, {
+          headers: { "Content-Type": "multipart/form-data" },
+        });
+      } else {
+        console.log("🆕 Uploading new image...");
+        const formDataObj = new FormData();
+        formDataObj.append("image", file);
+
+        response = await axios.post(urls.uploadImage, formDataObj, {
+          headers: { "Content-Type": "multipart/form-data" },
+        });
+      }
+
+      console.log("🖼️ Image Upload/Update Response:", response.data);
+
+      const newImageUrl =
+        response.data?.url ||
+        response.data?.result?.secure_url ||
+        response.data?.result?.url;
+
+      if (newImageUrl) {
+        setImage(newImageUrl);
+        setFormData((prev) => ({
+          ...prev,
+          image: newImageUrl,
+        }));
+      }
+    } catch (error) {
+      console.error("❌ Error uploading/updating image:", error.response?.data || error);
+    }
+  };
+
+  // 🗑️ Handle delete
+  const handleDeleteImage = async () => {
+    if (!formData.image) return;
+
+    const match = formData.image.match(/upload\/(.*?)\./);
+    const publicId = match ? `uploads/${match[1]}` : null;
+    if (!publicId) {
+      console.warn("⚠️ Could not extract public_id from image URL");
+      return;
+    }
+
+    try {
+      const res = await axios.post(urls.deleteImage, {
+        public_ids: [publicId],
+      });
+      console.log("🗑️ Image deleted:", res.data);
+
+      // Clear image from UI
+      setFormData((prev) => ({ ...prev, image: "" }));
+      setSelectedImage(null);
+      setImage("");
+    } catch (err) {
+      console.error("❌ Error deleting image:", err.response?.data || err);
+    }
   };
 
   const handleSelectGateway = (gatewayId) => {
@@ -161,136 +233,100 @@ const handleChange = (e) => {
     setLoading(true);
 
     const newErrors = {};
-  
+
     if (!formData.firstname) newErrors.firstname = "First name is required";
     if (!formData.lastname) newErrors.lastname = "Last name is required";
     if (!formData.email) newErrors.email = "Email is required";
     if (!formData.contact) newErrors.contact = "Phone number is required";
     if (!formData.password && !isEditMode) newErrors.password = "Password is required";
-   
+
     if (formData.contact && !isPhoneValid(formData.contact)) {
       newErrors.contact = "Phone number must be exactly 11 digits";
     }
-
-   
-
     if (!isEmailValid(formData.email)) {
       newErrors.email = "Invalid email format";
     }
-  
-    if (!isPhoneValid(formData.contact)) {
-      newErrors.contact = "Invalid phone number";
-    }
-  
-  
 
-  
     if (Object.keys(newErrors).length > 0) {
       setErrors(newErrors);
       setLoading(false);
       return;
     }
-  
+
     setErrors({});
-    
-  
+
     try {
-      let imageUrl = formData.image;
-  
-      if (selectedFile) {
-        const timestamp = new Date().getTime();
-        const randomNumber = Math.floor(Math.random() * 10000);
-        const uniqueFilename = `image_${timestamp}_${randomNumber}.png`;
-  
-        const uploadForm = new FormData();
-        uploadForm.append('image', selectedFile, uniqueFilename);
-  
-        const uploadResponse = await axios.post('https://mexemai.com/bucket/update/ems', uploadForm);
-        imageUrl = uploadResponse.data.image_url;
-      }
-  
-      // Create the user object (excluding image and gateways)
+      const finalImage = image || formData.image;
+
       const createdById = getUserIdFromLocalStorage();
 
       const userPayload = {
         ...formData,
-        ...(imageUrl ? { image: imageUrl } : {}),
+        image: finalImage,
         password: isEditMode ? undefined : formData.password,
         created_by_id: createdById,
       };
-      
-  
-      // Clean up undefined values
+
       const cleanedUserPayload = Object.fromEntries(
-        Object.entries(userPayload).filter(([_, v]) => v !== undefined && v !== '' && v !== null)
+        Object.entries(userPayload).filter(([_, v]) => v !== undefined && v !== "" && v !== null)
       );
-      
-  
-      // Create the gateway object separately
-      const gatewayPayload = {
-        user_id: userId,
-        gateway_ids: selectedGatewaysList.map(gw => gw.G_id),
-      };
-  
+
+      console.log("🧾 FULL FORM DATA:", formData);
+      console.log("🖼️ Final Image URL:", finalImage);
+      console.log("🧹 Cleaned Payload:", cleanedUserPayload);
+
       const apiUrl = isEditMode ? urls.updateUser(userId) : urls.createUser;
-      const method = 'POST';
-  
-      // Combine both objects into one payload if backend expects that
-      const fullPayload = {
-        ...cleanedUserPayload,
-        ...gatewayPayload, // ✅ this will now send user_id and gateway_ids separately
-      };
-  
+      const method = "POST";
+
+      // ✅ Send user creation/update request
       const response = await fetch(apiUrl, {
         method,
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(fullPayload),
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(cleanedUserPayload),
       });
-  
+
       const responseData = await response.json();
 
-
-  
       if (response.ok) {
         const createdUserId = responseData.id || userId;
 
-
         if (!createdUserId) {
-          alert('User ID is missing. Cannot assign gateways.')
-          return
+          alert("User ID is missing. Cannot assign gateways.");
+          return;
         }
 
+        // ✅ Assign selected gateways (only if any selected)
         if (selectedGatewaysList.length > 0) {
           const gatewayPayload = {
             user_id: createdUserId,
-            gateway_ids: selectedGatewaysList.map((gateway) => gateway.G_id), // ✅ Fix incorrect key
-          }
+            gateway_ids: selectedGatewaysList.map((gw) => gw.G_id),
+          };
 
-          const gatewayResponse = await axios.post(assignGateway, gatewayPayload)
+          console.log("📡 Gateway Assignment Payload:", gatewayPayload);
+
+          const gatewayResponse = await axios.post(assignGateway, gatewayPayload);
 
           if (gatewayResponse.status === 200) {
-            console.log('✅ Gateways assigned successfully')
-            // fetchAssignedGateways(createdUserId);
+            console.log("✅ Gateways assigned successfully");
           } else {
-            console.error('❌ Failed to assign gateways', gatewayResponse.data)
-            alert('Failed to assign gateways. Please try again.')
+            console.error("❌ Failed to assign gateways", gatewayResponse.data);
+            alert("Failed to assign gateways. Please try again.");
           }
         }
-        alert(isEditMode ? 'User updated successfully' : 'User created successfully');
-        navigate('/dashboard/manage_users');
+
+        alert(isEditMode ? "User updated successfully" : "User created successfully");
+        navigate("/dashboard/manage_users");
       } else {
-        alert(responseData?.message || 'An error occurred');
+        alert(responseData?.message || "An error occurred");
       }
     } catch (error) {
-      console.error('Error creating/updating user:', error);
-      alert('An error occurred while creating/updating the user');
+      console.error("❌ Error creating/updating user:", error);
+      alert("An error occurred while creating/updating the user");
     } finally {
       setLoading(false);
     }
   };
-  
-  
-  
+
 
 
 
@@ -303,90 +339,90 @@ const handleChange = (e) => {
 
       <Box sx={{ display: 'flex', gap: 3 }}>
         <Box sx={{ flex: 1 }}>
-        <TextField
-  name="firstname"
-  label="First Name *"
-  value={formData.firstname}
-  onChange={handleChange}
-  fullWidth
-  sx={{ mb: 2 }}
-  error={!!errors.firstname}
-  helperText={errors.firstname}
-/>
+          <TextField
+            name="firstname"
+            label="First Name *"
+            value={formData.firstname}
+            onChange={handleChange}
+            fullWidth
+            sx={{ mb: 2 }}
+            error={!!errors.firstname}
+            helperText={errors.firstname}
+          />
 
-<TextField
-  name="lastname"
-  label="Last Name *"
-  value={formData.lastname}
-  onChange={handleChange}
-  fullWidth
-  sx={{ mb: 2 }}
-  error={!!errors.lastname}
-  helperText={errors.lastname}
-/>
+          <TextField
+            name="lastname"
+            label="Last Name *"
+            value={formData.lastname}
+            onChange={handleChange}
+            fullWidth
+            sx={{ mb: 2 }}
+            error={!!errors.lastname}
+            helperText={errors.lastname}
+          />
 
-<TextField
-  name="email"
-  label="Email *"
-  value={formData.email}
-  onChange={handleChange}
-  fullWidth
-  sx={{ mb: 2 }}
-  error={!!errors.email}
-  helperText={errors.email}
-/>
+          <TextField
+            name="email"
+            label="Email *"
+            value={formData.email}
+            onChange={handleChange}
+            fullWidth
+            sx={{ mb: 2 }}
+            error={!!errors.email}
+            helperText={errors.email}
+          />
 
-<TextField
-  name="contact"
-  label="Phone Number *"
-  value={formData.contact}
-  onChange={handleChange}
-  fullWidth
-  sx={{ mb: 2 }}
-  error={!!errors.contact}
-  helperText={errors.contact}
-/>
+          <TextField
+            name="contact"
+            label="Phone Number *"
+            value={formData.contact}
+            onChange={handleChange}
+            fullWidth
+            sx={{ mb: 2 }}
+            error={!!errors.contact}
+            helperText={errors.contact}
+          />
 
-    
-    <TextField
-      name="adress"
-      label="Address"
-      value={formData.adress}
-      onChange={handleChange}
-      fullWidth
-      sx={{ mb: 2 }}
-      error={!!errors.adress}
-      helperText={errors.adress}
-    />
-    
-    
-              <TextField
-      name="zip_code"
-      label="Zip code"
-      value={formData.zip_code}
-      onChange={handleChange}
-      fullWidth
-      sx={{ mb: 2 }}
-      error={!!errors.zip_code}
-      helperText={errors.zip_code}
-    />
-    
-    
-    
-    {!isEditMode && (
-      <TextField
-        name="password"
-        label="Password *"
-        value={formData.password}
-        onChange={handleChange}
-        fullWidth
-        type="password"
-        sx={{ mb: 2 }}
-        error={!!errors.password}
-        helperText={errors.password}
-      />
-    )}
-          
+
+          <TextField
+            name="adress"
+            label="Address"
+            value={formData.adress}
+            onChange={handleChange}
+            fullWidth
+            sx={{ mb: 2 }}
+            error={!!errors.adress}
+            helperText={errors.adress}
+          />
+
+
+          <TextField
+            name="zip_code"
+            label="Zip code"
+            value={formData.zip_code}
+            onChange={handleChange}
+            fullWidth
+            sx={{ mb: 2 }}
+            error={!!errors.zip_code}
+            helperText={errors.zip_code}
+          />
+
+
+
+          {!isEditMode && (
+            <TextField
+              name="password"
+              label="Password *"
+              value={formData.password}
+              onChange={handleChange}
+              fullWidth
+              type="password"
+              sx={{ mb: 2 }}
+              error={!!errors.password}
+              helperText={errors.password}
+            />
+          )}
+
 
           <Button variant="contained" onClick={handleSubmit} fullWidth disabled={loading}>
             {loading ? 'Saving...' : isEditMode ? 'Update User' : 'Create User'}
@@ -394,36 +430,68 @@ const handleChange = (e) => {
         </Box>
 
         <Box sx={{ flex: 1 }}>
-  {selectedImage || formData.image ? (
-    <img src={selectedImage || formData.image} alt="Uploaded" style={{ width: '100%', borderRadius: 8 }} />
-  ) : (
-    <Box
-      sx={{
-        width: '100%',
-        height: 200,
-        backgroundColor: '#f0f0f0',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        borderRadius: 2,
-        border: '2px dashed #ccc',
-      }}
-    >
-      <Typography>No Image Selected</Typography>
-    </Box>
-  )}
+          {selectedImage || formData.image ? (
+            <Box sx={{ position: "relative", display: "inline-block", width: "100%" }}>
+              <img
+                src={selectedImage || formData.image}
+                alt="Uploaded"
+                style={{
+                  width: "100%",
+                  borderRadius: 8,
+                  objectFit: "cover",
+                }}
+              />
 
-  {errors.image && (
-    <Typography sx={{ color: 'red', mt: 1 }} variant="body2">
-      {errors.image}
-    </Typography>
-  )}
+              {/* ❌ Cross icon for delete */}
+              <Box
+                onClick={handleDeleteImage}
+                sx={{
+                  position: "absolute",
+                  top: 8,
+                  right: 8,
+                  backgroundColor: "rgba(255,255,255,0.8)",
+                  borderRadius: "50%",
+                  width: 28,
+                  height: 28,
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  cursor: "pointer",
+                  transition: "0.2s",
+                  "&:hover": { backgroundColor: "rgba(255,0,0,0.8)", color: "white" },
+                }}
+              >
+                ✕
+              </Box>
+            </Box>
+          ) : (
+            <Box
+              sx={{
+                width: "100%",
+                height: 200,
+                backgroundColor: "#f0f0f0",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                borderRadius: 2,
+                border: "2px dashed #ccc",
+              }}
+            >
+              <Typography>No Image Selected</Typography>
+            </Box>
+          )}
 
-  <Button variant="contained" component="label" fullWidth sx={{ mt: 2 }}>
-    Upload Image
-    <input type="file" accept="image/*" hidden onChange={handleImageUpload} />
-  </Button>
-   {role === 'admin' &&  <Select
+          {errors.image && (
+            <Typography sx={{ color: 'red', mt: 1 }} variant="body2">
+              {errors.image}
+            </Typography>
+          )}
+
+          <Button variant="contained" component="label" fullWidth sx={{ mt: 2 }}>
+            Upload Image
+            <input type="file" accept="image/*" hidden onChange={handleImageUpload} />
+          </Button>
+          {role === 'admin' && <Select
             value={selectedGateway}
             onChange={(e) => {
               setSelectedGateway(e.target.value);
@@ -440,14 +508,14 @@ const handleChange = (e) => {
               </MenuItem>
             ))}
           </Select>}
-       
-      
-</Box>
+
+
+        </Box>
 
       </Box>
 
-    {role === 'admin' &&  <Box sx={{ display: 'flex', gap: 3, mt: 4 }}>
-      <Box sx={{ flex: 1 }}>
+      {role === 'admin' && <Box sx={{ display: 'flex', gap: 3, mt: 4 }}>
+        <Box sx={{ flex: 1 }}>
           <Typography variant="subtitle1" gutterBottom>
             Assigned Gateways
           </Typography>
@@ -459,7 +527,7 @@ const handleChange = (e) => {
                 <ListItem
                   key={gateway.G_id}
                   button
-                  // onClick={() => setSelectedAssignedGateway(gateway.G_id)}
+                // onClick={() => setSelectedAssignedGateway(gateway.G_id)}
                 >
                   <ListItemText primary={gateway.gateway_name} secondary={gateway.mac_address} />
                 </ListItem>
@@ -487,7 +555,7 @@ const handleChange = (e) => {
           </List>
         </Box>
       </Box>}
-    </Box> 
+    </Box>
   );
 };
 

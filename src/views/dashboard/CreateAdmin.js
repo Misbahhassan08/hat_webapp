@@ -34,6 +34,9 @@ const CreateUser = () => {
   const loggedInUserId = userData?.user_id; // ID of the admin creating a user
   const isEditMode = receivedUser?.id !== undefined;
   const userId = receivedUser?.id;
+  const [image, setImage] = useState("");
+  console.log("uploaded image", image);
+
   const handleRoleChange = (event) => {
     setFormData({ ...formData, role: event.target.value })
   }
@@ -97,34 +100,106 @@ const CreateUser = () => {
 
   const handleChange = (e) => {
     const { name, value } = e.target;
-  
+
     if (name === 'contact') {
       // Remove non-numeric characters except dash
       let cleaned = value.replace(/[^\d]/g, '');
-  
+
       // Limit to 11 digits
       if (cleaned.length > 11) cleaned = cleaned.slice(0, 11);
-  
+
       // Add dash after 4 digits if at least 5 digits are entered
       if (cleaned.length > 4) {
         cleaned = cleaned.slice(0, 4) + '-' + cleaned.slice(4);
       }
-  
+
       setFormData({ ...formData, [name]: cleaned });
     } else {
       setFormData({ ...formData, [name]: value });
     }
   };
-  
 
+  // 🖼️ Handle upload OR update
   const handleImageUpload = async (event) => {
     const file = event.target.files[0];
     if (!file) return;
 
-    setSelectedFile(file);
     const preview = URL.createObjectURL(file);
     setSelectedImage(preview);
+
+    try {
+      let response;
+
+      // Extract public_id if editing existing user
+      const match = formData.image?.match(/upload\/(.*?)\./);
+      const publicId = match ? `uploads/${match[1]}` : null;
+
+      if (isEditMode && publicId) {
+        console.log("🪶 Updating existing image with public_id:", publicId);
+        const formDataObj = new FormData();
+        formDataObj.append("public_id", publicId);
+        formDataObj.append("image", file);
+
+        response = await axios.post(urls.updateImage, formDataObj, {
+          headers: { "Content-Type": "multipart/form-data" },
+        });
+      } else {
+        console.log("🆕 Uploading new image...");
+        const formDataObj = new FormData();
+        formDataObj.append("image", file);
+
+        response = await axios.post(urls.uploadImage, formDataObj, {
+          headers: { "Content-Type": "multipart/form-data" },
+        });
+      }
+
+      console.log("🖼️ Image Upload/Update Response:", response.data);
+
+      const newImageUrl =
+        response.data?.url ||
+        response.data?.result?.secure_url ||
+        response.data?.result?.url;
+
+      if (newImageUrl) {
+        setImage(newImageUrl);
+        setFormData((prev) => ({
+          ...prev,
+          image: newImageUrl,
+        }));
+      }
+    } catch (error) {
+      console.error("❌ Error uploading/updating image:", error.response?.data || error);
+    }
   };
+
+  // 🗑️ Handle delete
+  const handleDeleteImage = async () => {
+    if (!formData.image) return;
+
+    const match = formData.image.match(/upload\/(.*?)\./);
+    const publicId = match ? `uploads/${match[1]}` : null;
+    if (!publicId) {
+      console.warn("⚠️ Could not extract public_id from image URL");
+      return;
+    }
+
+    try {
+      const res = await axios.post(urls.deleteImage, {
+        public_ids: [publicId],
+      });
+      console.log("🗑️ Image deleted:", res.data);
+
+      // Clear image from UI
+      setFormData((prev) => ({ ...prev, image: "" }));
+      setSelectedImage(null);
+      setImage("");
+    } catch (err) {
+      console.error("❌ Error deleting image:", err.response?.data || err);
+    }
+  };
+
+
+
 
   const handleSelectGateway = (gatewayId) => {
     const selected = unassignedGateway.find((g) => g.G_id === gatewayId);
@@ -136,91 +211,67 @@ const CreateUser = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
-  
+
     const newErrors = {};
-  
+
     if (!formData.firstname) newErrors.firstname = "First name is required";
     if (!formData.lastname) newErrors.lastname = "Last name is required";
     if (!formData.email) newErrors.email = "Email is required";
     if (!formData.contact) newErrors.contact = "Phone number is required";
     if (!formData.password && !isEditMode) newErrors.password = "Password is required";
-  
-    if (formData.contact && !isPhoneValid(formData.contact)) {
-      newErrors.contact = "Phone number must be exactly 11 digits";
-    }
 
-  
-            
-    
-  
-    if (!isEmailValid(formData.email)) {
-      newErrors.email = "Invalid email format";
-    }
-  
-    if (!isPhoneValid(formData.contact)) {
-      newErrors.contact = "Invalid phone number";
-    }
-  
-  
+    if (!isEmailValid(formData.email)) newErrors.email = "Invalid email format";
+    if (!isPhoneValid(formData.contact)) newErrors.contact = "Invalid phone number";
 
-  
     if (Object.keys(newErrors).length > 0) {
       setErrors(newErrors);
       setLoading(false);
       return;
     }
-  
+
     setErrors({}); // Clear previous errors if valid
-  
+
     try {
-      let imageUrl = formData.image;
-      if (selectedFile) {
-        const timestamp = new Date().getTime();
-        const randomNumber = Math.floor(Math.random() * 10000);
-        const uniqueFilename = `image_${timestamp}_${randomNumber}.png`;
-  
-        const uploadForm = new FormData();
-        uploadForm.append('image', selectedFile, uniqueFilename);
-        const uploadResponse = await axios.post('https://mexemai.com/bucket/update/ems', uploadForm);
-        imageUrl = uploadResponse.data.image_url;
-      }
-  
+      const finalImage = image || formData.image;
+
       const payload = {
         ...formData,
-        ...(imageUrl ? { image: imageUrl } : {}),
+        image: finalImage,
         password: isEditMode ? undefined : formData.password,
       };
-  
+
+      // Remove undefined/empty values
       const cleanedPayload = Object.fromEntries(
-        Object.entries(payload).filter(([_, v]) => v !== undefined && v !== '')
+        Object.entries(payload).filter(([_, v]) => v !== undefined && v !== "")
       );
-      
-  
+
+      // console.log("🧾 FULL FORM DATA (before clean):", formData);
+      // console.log("🖼️ Final image URL:", finalImage);
+      // console.log("🧹 Cleaned Payload (ready to send):", cleanedPayload);
+
       const apiUrl = isEditMode ? urls.updateUser(userId) : urls.createUser;
-      const method = 'POST';
-  
-      const response = await fetch(apiUrl, {
-        method,
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(cleanedPayload),
+
+      // ✅ Send JSON body
+      const response = await axios.post(apiUrl, cleanedPayload, {
+        headers: {
+          "Content-Type": "application/json",
+        },
       });
-  
-      const responseData = await response.json();
-  
-      if (response.ok) {
-        alert(isEditMode ? 'Admin updated successfully' : 'Admin created successfully');
-        navigate('/dashboard/manageAdmin');
-      } else {
-        alert(responseData?.message || 'An error occurred');
-      }
+
+      console.log("✅ Full API Response:", response.data);
+      toast.success(isEditMode ? "Admin updated successfully!" : "Admin created successfully!");
+      navigate("/dashboard/manageAdmin");
+
     } catch (error) {
-      console.error('Error creating/updating user:', error);
-      alert('An error occurred while creating/updating the user');
+      console.error("❌ Error creating/updating user:", error.response?.data || error);
+      toast.error("An error occurred while creating/updating the user");
     } finally {
       setLoading(false);
     }
   };
-  
+
+
+
 
 
 
@@ -233,131 +284,163 @@ const CreateUser = () => {
 
       <Box sx={{ display: 'flex', gap: 3 }}>
         <Box sx={{ flex: 1 }}>
-        <TextField
-  name="firstname"
-  label="First Name *"
-  value={formData.firstname}
-  onChange={handleChange}
-  fullWidth
-  sx={{ mb: 2 }}
-  error={!!errors.firstname}
-  helperText={errors.firstname}
-/>
+          <TextField
+            name="firstname"
+            label="First Name *"
+            value={formData.firstname}
+            onChange={handleChange}
+            fullWidth
+            sx={{ mb: 2 }}
+            error={!!errors.firstname}
+            helperText={errors.firstname}
+          />
 
-<TextField
-  name="lastname"
-  label="Last Name *"
-  value={formData.lastname}
-  onChange={handleChange}
-  fullWidth
-  sx={{ mb: 2 }}
-  error={!!errors.lastname}
-  helperText={errors.lastname}
-/>
+          <TextField
+            name="lastname"
+            label="Last Name *"
+            value={formData.lastname}
+            onChange={handleChange}
+            fullWidth
+            sx={{ mb: 2 }}
+            error={!!errors.lastname}
+            helperText={errors.lastname}
+          />
 
-<TextField
-  name="email"
-  label="Email *"
-  value={formData.email}
-  onChange={handleChange}
-  fullWidth
-  sx={{ mb: 2 }}
-  error={!!errors.email}
-  helperText={errors.email}
-/>
+          <TextField
+            name="email"
+            label="Email *"
+            value={formData.email}
+            onChange={handleChange}
+            fullWidth
+            sx={{ mb: 2 }}
+            error={!!errors.email}
+            helperText={errors.email}
+          />
 
-<TextField
-  name="contact"
-  label="Phone Number *"
-  value={formData.contact}
-  onChange={handleChange}
-  fullWidth
-  sx={{ mb: 2 }}
-  error={!!errors.contact}
-  helperText={errors.contact}
-/>
-
-    
-    <TextField
-      name="adress"
-      label="Address"
-      value={formData.adress}
-      onChange={handleChange}
-      fullWidth
-      sx={{ mb: 2 }}
-      error={!!errors.adress}
-      helperText={errors.adress}
-    />
-    
-    
-              <TextField
-      name="zip_code"
-      label="Zip code"
-      value={formData.zip_code}
-      onChange={handleChange}
-      fullWidth
-      sx={{ mb: 2 }}
-      error={!!errors.zip_code}
-      helperText={errors.zip_code}
-    />
+          <TextField
+            name="contact"
+            label="Phone Number *"
+            value={formData.contact}
+            onChange={handleChange}
+            fullWidth
+            sx={{ mb: 2 }}
+            error={!!errors.contact}
+            helperText={errors.contact}
+          />
 
 
+          <TextField
+            name="adress"
+            label="Address"
+            value={formData.adress}
+            onChange={handleChange}
+            fullWidth
+            sx={{ mb: 2 }}
+            error={!!errors.adress}
+            helperText={errors.adress}
+          />
 
-{!isEditMode && (
-  <TextField
-            name="password"
-        label="Password *"
-    value={formData.password}
-    onChange={handleChange}
-    fullWidth
-    type="password"
-    sx={{ mb: 2 }}
-    error={!!errors.password}
-    helperText={errors.password}
-  />
-)}
-          
 
-          <Button variant="contained" onClick={handleSubmit}  fullWidth disabled={loading}>
+          <TextField
+            name="zip_code"
+            label="Zip code"
+            value={formData.zip_code}
+            onChange={handleChange}
+            fullWidth
+            sx={{ mb: 2 }}
+            error={!!errors.zip_code}
+            helperText={errors.zip_code}
+          />
+
+
+
+          {!isEditMode && (
+            <TextField
+              name="password"
+              label="Password *"
+              value={formData.password}
+              onChange={handleChange}
+              fullWidth
+              type="password"
+              sx={{ mb: 2 }}
+              error={!!errors.password}
+              helperText={errors.password}
+            />
+          )}
+
+
+          <Button variant="contained" onClick={handleSubmit} fullWidth disabled={loading}>
             {loading ? 'Saving...' : isEditMode ? 'Update Admin' : 'Create Admin'}
           </Button>
         </Box>
 
         <Box sx={{ flex: 1 }}>
-  {selectedImage || formData.image ? (
-    <img src={selectedImage || formData.image} alt="Uploaded" style={{ width: '100%', borderRadius: 8 }} />
-  ) : (
-    <Box
-      sx={{
-        width: '100%',
-        height: 200,
-        backgroundColor: '#f0f0f0',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        borderRadius: 2,
-        border: '2px dashed #ccc',
-      }}
-    >
-      <Typography>No Image Selected</Typography>
-    </Box>
-  )}
+          {selectedImage || formData.image ? (
+            <Box sx={{ position: "relative", display: "inline-block", width: "100%" }}>
+              <img
+                src={selectedImage || formData.image}
+                alt="Uploaded"
+                style={{
+                  width: "100%",
+                  borderRadius: 8,
+                  objectFit: "cover",
+                }}
+              />
 
-  {errors.image && (
-    <Typography sx={{ color: 'red', mt: 1 }} variant="body2">
-      {errors.image}
-    </Typography>
-  )}
+              {/* ❌ Cross icon for delete */}
+              <Box
+                onClick={handleDeleteImage}
+                sx={{
+                  position: "absolute",
+                  top: 8,
+                  right: 8,
+                  backgroundColor: "rgba(255,255,255,0.8)",
+                  borderRadius: "50%",
+                  width: 28,
+                  height: 28,
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  cursor: "pointer",
+                  transition: "0.2s",
+                  "&:hover": { backgroundColor: "rgba(255,0,0,0.8)", color: "white" },
+                }}
+              >
+                ✕
+              </Box>
+            </Box>
+          ) : (
+            <Box
+              sx={{
+                width: "100%",
+                height: 200,
+                backgroundColor: "#f0f0f0",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                borderRadius: 2,
+                border: "2px dashed #ccc",
+              }}
+            >
+              <Typography>No Image Selected</Typography>
+            </Box>
+          )}
 
-  <Button variant="contained" component="label" fullWidth sx={{ mt: 2 }}>
-    Upload Image
-    <input type="file" accept="image/*" hidden onChange={handleImageUpload} />
-  </Button>
-</Box>
+          {errors.image && (
+            <Typography sx={{ color: 'red', mt: 1 }} variant="body2">
+              {errors.image}
+            </Typography>
+          )}
+
+          <Button variant="contained" component="label" fullWidth sx={{ mt: 2 }}>
+            Upload Image
+            <input type="file" accept="image/*" hidden onChange={handleImageUpload} />
+          </Button>
+        </Box>
 
       </Box>
 
-    
+
     </Box>
   );
 };

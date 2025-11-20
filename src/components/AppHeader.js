@@ -60,33 +60,49 @@ const AppHeader = () => {
   }
 
   const handleLogout = async () => {
-    localStorage.removeItem('selectedGateways')
-    localStorage.removeItem('user')
-    localStorage.removeItem('selectedProjectId')
-    localStorage.removeItem('selectedGatewayId')
-
-
     try {
-      const token = localStorage.getItem('authToken'); // ✅ Ensure token is included
-  
-      const response = await axios.post(urls.logout, 
-        {}, // ✅ Some APIs require an empty object in the body
+      const user = JSON.parse(localStorage.getItem("user"));
+      const email = user?.email;
+
+      if (!email) {
+        console.warn("⚠️ No email found in localStorage — cannot logout properly");
+        return;
+      }
+
+      console.log("📤 Sending logout request to:", urls.logout);
+      console.log("📧 Logging out user with email:", email);
+
+      const response = await axios.post(
+        urls.logout,
+        { email: email }, 
         {
           headers: {
-            'Authorization': `Bearer ${token}`, // ✅ Send token if required
-            'Content-Type': 'application/json',
-          }
+            "Content-Type": "application/json",
+          },
         }
       );
-  
-      if (response.status === 200) {
-        localStorage.removeItem('authToken'); // ✅ Remove token after logout
-        navigate('/login'); // ✅ Redirect to login page
+
+      console.log(" Logout API Response:", response.data);
+
+      if (response.data.success) {
+        // Clear local storage and navigate to login
+        localStorage.removeItem("authToken");
+        localStorage.removeItem("selectedGateways");
+        localStorage.removeItem("user");
+        localStorage.removeItem("selectedProjectId");
+        localStorage.removeItem("selectedGatewayId");
+        navigate("/login");
+      } else {
+        console.warn("⚠️ Logout API returned false:", response.data);
       }
     } catch (error) {
-      console.error('Logout failed:', error);
+      console.error("❌ Logout failed:", error);
+      if (error.response) {
+        console.error("🔍 Error response from server:", error.response.data);
+      }
     }
   };
+
 
   useEffect(() => {
     document.addEventListener('scroll', () => {
@@ -111,14 +127,14 @@ const AppHeader = () => {
         </CHeaderToggler>
         <CHeaderNav className="d-none d-md-flex">
           <CNavItem>
-<CNavLink
-  to="/dashboard"
-  as={NavLink}
-  style={{ color: theme.palette.text.TextColor, fontSize: '0.8rem' }}
->
-  {`Welcome ${user.firstname} ${user.lastname} `}
-  {/* {`Welcome ${user.firstname} ${user.lastname} (${user.role})`} */}
-</CNavLink>
+            <CNavLink
+              to="/dashboard"
+              as={NavLink}
+              style={{ color: theme.palette.text.TextColor, fontSize: '0.8rem' }}
+            >
+              {`Welcome ${user.firstname} ${user.lastname} `}
+              {/* {`Welcome ${user.firstname} ${user.lastname} (${user.role})`} */}
+            </CNavLink>
 
           </CNavItem>
         </CHeaderNav>

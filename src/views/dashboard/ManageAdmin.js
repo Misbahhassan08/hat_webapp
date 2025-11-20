@@ -19,6 +19,7 @@ import {
   DialogContent,
   DialogActions,
   Button,
+  Avatar,
 } from '@mui/material';
 import axios from 'axios';
 import { Edit, Delete } from '@mui/icons-material';
@@ -66,15 +67,17 @@ const ManageAdmin = () => {
       .toLowerCase()
       .includes(searchTerm.toLowerCase())
   );
-  
 
-  
+
+
   // Fetch the admins on page load
   useEffect(() => {
     const fetchAdmins = async () => {
       try {
         const response = await axios.get(urls.adminDetailsSuperAdmin);
         setAdmins(response.data.admins); // Extract the admins array from the response
+        console.log("admins data", response.data);
+
       } catch (error) {
         console.error("Error fetching admins:", error);
       }
@@ -88,20 +91,20 @@ const ManageAdmin = () => {
 
   const handleEditUser = (user) => {
     console.log("🛠️ handleEditUser called with user:", user);
-  
+
     if (!user?.id) {
       console.error("❌ No user_id found. Aborting navigation.");
       return;
     }
-  
+
     // Create user data object
     const userData = { user };
-  
+
     // Navigate to the edit page with user data in the state
     navigate('/dashboard/CreateAdmin', { state: { userData } });
     console.log("➡️ Navigating to /dashboard/create_admin with user:", user);
   };
-  
+
 
   return (
     <div className="w-full">
@@ -158,47 +161,81 @@ const ManageAdmin = () => {
         />
       </Box>
 
-{/* Admins Table */}
-<TableContainer component={Paper} sx={{ marginTop: 2, marginBottom:2 }}>
-  <Table>
-    <TableHead>
-      <TableRow>
-        <TableCell style={{ fontWeight: "bold" }}>Sr No.</TableCell>
-        <TableCell style={{ fontWeight: "bold" }}>First Name</TableCell>
-        <TableCell style={{ fontWeight: "bold" }}>Last Name</TableCell>
-        <TableCell style={{ fontWeight: "bold" }}>Email</TableCell>
-        <TableCell style={{ fontWeight: "bold" }}>Phone Number</TableCell>
-        <TableCell style={{ fontWeight: "bold" }}>Address</TableCell>
-        <TableCell style={{ fontWeight: "bold" }}>Zip Code</TableCell>
-        <TableCell style={{ fontWeight: "bold" }}>Edit</TableCell>
-      </TableRow>
-    </TableHead>
+      {/* Admins Table */}
+      <TableContainer
+        component={Paper}
+        sx={{
+          marginTop: 2,
+          marginBottom: 2,
+          width: '100%',
+          overflow: 'auto'
+        }}
+      >
+        <Table sx={{ minWidth: 700 }}>
+          <TableHead>
+            <TableRow>
+              <TableCell align="center" sx={{ fontWeight: "bold", whiteSpace: 'nowrap' }}>
+                Sr No.
+              </TableCell>
+              <TableCell align="center" sx={{ fontWeight: 'bold', whiteSpace: 'nowrap' }}>
+                Avatar
+              </TableCell>
+              <TableCell align="center" sx={{ fontWeight: "bold", whiteSpace: 'nowrap' }}>
+                Name
+              </TableCell>
+              <TableCell align="center" sx={{ fontWeight: "bold", whiteSpace: 'nowrap' }}>
+                Email
+              </TableCell>
+              <TableCell align="center" sx={{ fontWeight: "bold", whiteSpace: 'nowrap' }}>
+                Phone Number
+              </TableCell>
+              <TableCell align="center" sx={{ fontWeight: "bold", whiteSpace: 'nowrap' }}>
+                Address
+              </TableCell>
+              <TableCell align="center" sx={{ fontWeight: "bold", whiteSpace: 'nowrap' }}>
+                Zip Code
+              </TableCell>
+              <TableCell align="center" sx={{ fontWeight: "bold", whiteSpace: 'nowrap' }}>
+                Edit
+              </TableCell>
+            </TableRow>
+          </TableHead>
 
-    <TableBody>
-      {filteredAdmins.map((admin, index) => (
-        <TableRow key={admin.id}>
-          <TableCell>{index + 1}</TableCell> {/* Sr No. */}
-          <TableCell>{admin.firstname}</TableCell>
-          <TableCell>{admin.lastname}</TableCell>
-          <TableCell>{admin.email}</TableCell>
-          <TableCell>{admin.contact || "-"}</TableCell>
-          <TableCell>{admin.address || "-"}</TableCell>
-          <TableCell>{admin.zip_code || "-"}</TableCell>
-          <TableCell>
-            <Box display="flex" gap={1}>
-              <IconButton color="primary" onClick={() => handleEditUser(admin)}>
-                <Edit />
-              </IconButton>
-              <IconButton color="error" onClick={() => handleOpenDialog(admin.id)}>
-                <Delete />
-              </IconButton>
-            </Box>
-          </TableCell>
-        </TableRow>
-      ))}
-    </TableBody>
-  </Table>
-</TableContainer>
+          <TableBody>
+            {filteredAdmins.map((admin, index) => (
+              <TableRow key={admin.id}>
+                <TableCell align="center">{index + 1}</TableCell>
+                <TableCell align="center">
+                  <Box display="flex" justifyContent="center">
+                    <Avatar
+                      src={admin.image || "https://via.placeholder.com/40"}
+                      alt={admin.firstname}
+                      sx={{ width: 50, height: 50 }}
+                    />
+                  </Box>
+                </TableCell>
+                <TableCell align="center">
+                  {admin.firstname} {admin.lastname}
+                </TableCell>
+                <TableCell align="center">{admin.email}</TableCell>
+                <TableCell align="center">{admin.contact || "-"}</TableCell>
+                <TableCell align="center">{admin.address || "-"}</TableCell>
+                <TableCell align="center">{admin.zip_code || "-"}</TableCell>
+                <TableCell align="center">
+                  <Box display="flex" gap={1} justifyContent="center">
+                    <IconButton color="primary" onClick={() => handleEditUser(admin)}>
+                      <Edit />
+                    </IconButton>
+                    <IconButton color="error" onClick={() => handleOpenDialog(admin.id)}>
+                      <Delete />
+                    </IconButton>
+                  </Box>
+                </TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      </TableContainer>
 
 
       {/* Delete Confirmation Dialog */}

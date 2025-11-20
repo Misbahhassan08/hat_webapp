@@ -79,14 +79,20 @@ const DeployGateway = () => {
   }, [userId])
 
   const handleDeploy = async () => {
-    if (!selectGateway || !currentProjectId) return
+    console.log("deploy function call");
+    
+    if (!selectGateway) return
+    console.log("gateway id",selectGateway);
+    
 
     try {
       const gatewayData = {
         G_id: selectGateway.G_id,
         deploy_status: "deployed",
-        project_id: currentProjectId,
+        // project_id: currentProjectId,
       }
+      console.log("gateway data", gatewayData);
+      
 
       const response = await fetch(`${urls.updateGateway}`, {
         method: "PUT",

@@ -8,10 +8,10 @@ import {
   TableCell,
   TableHead,
   TableRow,
-   Dialog,
-    DialogTitle,
-    DialogContent,
-    DialogActions,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
   IconButton,
   TableBody,
   Button,
@@ -23,7 +23,7 @@ import { Plus } from 'lucide-react'
 import axios from 'axios'
 import { ColorModeContext } from '../theme/ThemeContext'
 import { getUserIdFromLocalStorage } from '../../data/localStorage';
-import {  Delete } from '@mui/icons-material'
+import { Delete } from '@mui/icons-material'
 
 
 
@@ -139,7 +139,7 @@ const ManageHardware = () => {
     setSelectedGatewayId(gatewayId);
     setDeleteDialogOpen(true);
   };
-  
+
   const confirmDelete = async () => {
     try {
       await axios.post(`${urls.deleteGateway}/${selectedGatewayId}/`);
@@ -150,57 +150,72 @@ const ManageHardware = () => {
       setDeleteDialogOpen(false);
     }
   };
-  
-  
-  
-  useEffect(() => {
 
-    const fetchAllHardware = async () => {
-      try {
-        const response = await axios.get(urls.totalGateways);
-        console.log('response:', response);
-        const userId = getUserIdFromLocalStorage();
-    
-        const filteredData = response.data.Gateways.filter(
-          (item) => String(item.created_by_id) === String(userId) // filter by match
-        );
-    
-        const transformedHardware = filteredData.map((item) => {
-          let deployStatus = 'Warehouse';
-    
-          if (item.deploy_status === 'user_aloted') {
-            deployStatus = 'Assigned to User';
-          } else if (item.deploy_status === 'deployed') {
-            deployStatus = 'Deployed to User';
-          }
-    
-          return {
-            id: item.G_id,
-            gateway_name: item.gateway_name,
-            mac_address: item.mac_address,
-            status: item.status,
-            deploy_status: deployStatus,
-            user_id: item.user_id,  // Add user_id
-            user_image: item.user_image 
-            
-          };
-        });
-    
-        console.log('Filtered hardware:', transformedHardware);
-        setGateways(transformedHardware);
-      } catch (error) {
-        console.error('Error fetching gateway:', error);
-      }
-    };
-    fetchAllHardware(); // Call once on mount
-  
+
+
+  useEffect(() => {
+    fetchAllHardware();
+
     const intervalId = setInterval(() => {
-      fetchAllHardware(); // Poll projects every 5 seconds
+      fetchAllHardware();
     }, 5000);
-  
-    return () => clearInterval(intervalId); // Clear interval on unmount
+
+    return () => clearInterval(intervalId);
   }, []);
-  
+
+
+  const fetchAllHardware = async () => {
+    try {
+      const userId = getUserIdFromLocalStorage();
+      console.log("🧠 User ID from localStorage:", userId);
+
+      if (!userId) {
+        console.error("❌ No user ID found in localStorage.");
+        setGateways([]);
+        return;
+      }
+      const response = await axios.get(`${urls.totalGateways}?user_id=${userId}`);
+      console.log("API Response:", response.data);
+
+      // ✅ Fix key name (handles both uppercase & lowercase)
+      const gatewaysData = response.data.Gateways || response.data.gateways;
+      console.log("✅ Extracted Gateways:", gatewaysData);
+
+      if (!Array.isArray(gatewaysData)) {
+        console.error("❌ Gateways is not an array. Response structure:", response.data);
+        setGateways([]);
+        return;
+      }
+
+      // ✅ Transform and map table data
+      const transformedHardware = gatewaysData.map((item) => ({
+        id: item.G_id,
+        gateway_name: item.gateway_name,
+        mac_address: item.mac_address,
+        status: item.status,
+        deploy_status:
+          item.deploy_status === "user_aloted"
+            ? "Assigned to User"
+            : item.deploy_status === "deployed"
+              ? "Deployed to User"
+              : "Warehouse",
+        user_name: item.user_name,
+        user_image: item.user_image,
+        created_by_id: item.created_by_id,
+      }));
+
+      console.log("✅ Final table data:", transformedHardware);
+      setGateways(transformedHardware);
+    } catch (error) {
+      console.error("❌ Error fetching gateway:", error);
+    }
+  };
+
+
+
+
+
+
 
   // Handle Save in Modal
   const handleSave = async (gatewayName, macAddress) => {
@@ -240,12 +255,12 @@ const ManageHardware = () => {
         {/* Right Column (Clickable Icon) */}
         <div className="flex-1 text-right">
           <button
-          style={{background: theme.palette.background.create}}
+            style={{ background: theme.palette.background.create }}
             onClick={() => setIsModalOpen(true)} // Open modal on click
             className="flex items-center gap-2 text-blue-600 cursor-pointer"
           >
-            <Plus size={40} className="hover:scale-110 transition-transform"style={{color:theme.palette.text.TextColor}} />
-            <p style={{color: theme.palette.text.TextColor}}>Create Hardware</p>
+            <Plus size={40} className="hover:scale-110 transition-transform" style={{ color: theme.palette.text.TextColor }} />
+            <p style={{ color: theme.palette.text.TextColor }}>Create Hardware</p>
           </button>
         </div>
       </div>
@@ -293,19 +308,20 @@ const ManageHardware = () => {
             const nameMatch = gateway.gateway_name?.toLowerCase().includes(lowerSearchTerm);
             const macMatch = gateway.mac_address?.toLowerCase().includes(lowerSearchTerm);
             const statusMatch = gateway.deploy_status?.toLowerCase().includes(lowerSearchTerm);
-          
+
             return nameMatch || macMatch || statusMatch;
           });
-          
+
 
           return (
             <TableContainer component={Paper} sx={{ marginTop: 2 }}>
               <Table>
                 <TableHead>
                   <TableRow sx={{ background: theme.palette.background.paper }}>
-                  <TableCell style={{ fontWeight: 'bold' }}>Sr No</TableCell>
+                    <TableCell style={{ fontWeight: 'bold' }}>Sr No</TableCell>
 
                     <TableCell style={{ fontWeight: 'bold' }}>ID</TableCell>
+                    <TableCell style={{ fontWeight: 'bold' }}>Username</TableCell>
                     <TableCell style={{ fontWeight: 'bold' }}>Gateway Name</TableCell>
                     <TableCell style={{ fontWeight: 'bold' }}>MAC Address</TableCell>
                     <TableCell style={{ fontWeight: 'bold' }}>Deployment Status</TableCell>
@@ -317,109 +333,103 @@ const ManageHardware = () => {
                   {filteredGateways.length > 0 ? (
                     filteredGateways.map((gateway, index) => (
                       <TableRow key={gateway.id}>
-                                                <TableCell>{index + 1}</TableCell>
-
+                        <TableCell>{index + 1}</TableCell>
                         <TableCell>{gateway.id}</TableCell>
+
+                        {/* ✅ Correct Username Display */}
+                        <TableCell>{gateway.user_name || "—"}</TableCell>
+
                         <TableCell>{gateway.gateway_name}</TableCell>
                         <TableCell>{gateway.mac_address}</TableCell>
 
+                        <TableCell>
+                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                            <Button
+                              disableRipple
+                              disableElevation
+                              variant="contained"
+                              size="small"
+                              sx={{
+                                pointerEvents: 'none',
+                                cursor: 'default',
+                                backgroundColor:
+                                  gateway.deploy_status === 'Deployed to User'
+                                    ? 'rgb(48, 207, 48)'
+                                    : gateway.deploy_status === 'Assigned to User'
+                                      ? '#2337cb'
+                                      : '#ff2c2c',
+                                color: 'white',
+                                fontSize: '12px',
+                                '&:hover': {
+                                  backgroundColor:
+                                    gateway.deploy_status === 'Deployed to User'
+                                      ? 'rgb(48, 207, 48)'
+                                      : gateway.deploy_status === 'Assigned to User'
+                                        ? '#2337cb'
+                                        : '#ff2c2c',
+                                },
+                              }}
+                            >
+                              {gateway.deploy_status}
+                            </Button>
 
+                            {/* Avatar + Username */}
+                            {/* <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                              {gateway.user_image && (
+                                <img
+                                  src={gateway.user_image}
+                                  alt="User Avatar"
+                                  style={{
+                                    width: 30,
+                                    height: 30,
+                                    borderRadius: '50%',
+                                    objectFit: 'cover',
+                                  }}
+                                />
+                              )}
+                            </Box> */}
+                          </Box>
+                        </TableCell>
 
                         <TableCell>
-  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-    <Button
-      disableRipple
-      disableElevation
-      variant="contained"
-      size="small"
-      sx={{
-        pointerEvents: 'none', // Disables all interaction
-        cursor: 'default',     // Shows default arrow instead of pointer
-        backgroundColor:
-          gateway.deploy_status === 'Deployed to User'
-            ? 'rgb(48, 207, 48)'
-            : gateway.deploy_status === 'Assigned to User'
-              ? '#2337cb'
-              : '#ff2c2c',
-        color: 'white',
-        fontSize: '12px',
-        '&:hover': {
-          backgroundColor:
-            gateway.deploy_status === 'Deployed to User'
-              ? 'rgb(48, 207, 48)'
-              : gateway.deploy_status === 'Assigned to User'
-                ? '#2337cb'
-                : '#ff2c2c',
-        },
-      }}
-    >
-      {gateway.deploy_status}
-    </Button>
-
-    {/* Avatar and User ID */}
-    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-      {/* Avatar */}
-      {gateway.user_image && (
-        <img
-          src={gateway.user_image}  // Assuming the image URL is stored here
-          alt="User Avatar"
-          style={{
-            width: 30,
-            height: 30,
-            borderRadius: '50%',
-            objectFit: 'cover',
-          }}
-        />
-      )}
-
-      {/* User ID */}
-      <Typography variant="body2">{gateway.user_id}</Typography>
-    </Box>
-  </Box>
-</TableCell>
-
-
-
-<TableCell>
-<IconButton color="error" onClick={() => handleDeleteClick(gateway.id)}>
-  <Delete />
-</IconButton>
-
-</TableCell>
-
+                          <IconButton color="error" onClick={() => handleDeleteClick(gateway.id)}>
+                            <Delete />
+                          </IconButton>
+                        </TableCell>
                       </TableRow>
                     ))
                   ) : (
                     <TableRow>
-                      <TableCell colSpan={5} align="center">
+                      <TableCell colSpan={6} align="center" style={{ padding: "30px" }}>
                         No data available
                       </TableCell>
                     </TableRow>
                   )}
                 </TableBody>
+
               </Table>
             </TableContainer>
           )
         })()}
       </Box>
       <Dialog open={deleteDialogOpen} onClose={() => setDeleteDialogOpen(false)}>
-  <Box p={3}>
-    <Typography variant="h6" gutterBottom>
-      Confirm Deletion
-    </Typography>
-    <Typography variant="body1" gutterBottom>
-      Are you sure you want to permanently delete this hardware?
-    </Typography>
-    <Box mt={2} display="flex" justifyContent="flex-end" gap={2}>
-      <Button onClick={() => setDeleteDialogOpen(false)} variant="outlined" color="primary">
-        Cancel
-      </Button>
-      <Button onClick={confirmDelete} variant="contained" color="error">
-        Delete
-      </Button>
-    </Box>
-  </Box>
-</Dialog>
+        <Box p={3}>
+          <Typography variant="h6" gutterBottom>
+            Confirm Deletion
+          </Typography>
+          <Typography variant="body1" gutterBottom>
+            Are you sure you want to permanently delete this hardware?
+          </Typography>
+          <Box mt={2} display="flex" justifyContent="flex-end" gap={2}>
+            <Button onClick={() => setDeleteDialogOpen(false)} variant="outlined" color="primary">
+              Cancel
+            </Button>
+            <Button onClick={confirmDelete} variant="contained" color="error">
+              Delete
+            </Button>
+          </Box>
+        </Box>
+      </Dialog>
 
 
       {/* Add CSS Styles */}

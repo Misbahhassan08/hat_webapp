@@ -40,31 +40,31 @@ const DashBoard = () => {
   const [enrichedAdminDetails, setEnrichedAdminDetails] = useState([]);
   const navigate = useNavigate();
 
-  
-      
-  
-  
-  
-    useEffect(() => {
-      const getSuperAdminTotalProject = async () => {
-        try {
-          const response = await axios.get(urls.Get_superAdmin_Project_Count);
-          const data = response.data.total_projects;
-          console.log('Projects:', data);
-         
-  
-          setSuperAdminTotalProjectCount(data);
-        } catch (error) {
-          console.error('Error fetching user gateways:', error);
-        }
-      };
-    
-      getSuperAdminTotalProject(); // Call it once initially
-      const intervalId = setInterval(getSuperAdminTotalProject, 5000); // Then every 5 seconds
-    
-      return () => clearInterval(intervalId); // Cleanup on unmount
-    }, []);
-  
+
+
+
+
+
+  useEffect(() => {
+    const getSuperAdminTotalProject = async () => {
+      try {
+        const response = await axios.get(urls.Get_superAdmin_Project_Count);
+        const data = response.data.total_projects;
+        console.log('Projects:', data);
+
+
+        setSuperAdminTotalProjectCount(data);
+      } catch (error) {
+        console.error('Error fetching user gateways:', error);
+      }
+    };
+
+    getSuperAdminTotalProject(); // Call it once initially
+    const intervalId = setInterval(getSuperAdminTotalProject, 5000); // Then every 5 seconds
+
+    return () => clearInterval(intervalId); // Cleanup on unmount
+  }, []);
+
 
 
   // const dummyData = [
@@ -107,15 +107,17 @@ const DashBoard = () => {
         const response = await axios.get(urls.adminDetails);
         if (response.data) {
           setAdminDetails(response.data); // Response is already an array
+          console.log("response data admin", response.data);
+
         }
       } catch (error) {
         console.error('Error fetching admin details:', error);
       }
     };
-  
+
     fetchAdminDetails();
   }, []);
-  
+
   useEffect(() => {
     const fetchData = async () => {
       try {
@@ -123,47 +125,54 @@ const DashBoard = () => {
           axios.get(urls.fetchUser),
           axios.get(urls.getToalProject),
         ]);
-  
+
         const users = Array.isArray(usersResponse.data)
           ? usersResponse.data
           : usersResponse.data.users || [];
-  
+
         const projects = Array.isArray(projectsResponse.data)
           ? projectsResponse.data
           : projectsResponse.data.projects || [];
-  
+
         setAllUsers(users);
         setAllProjects(projects);
       } catch (error) {
         console.error('Error fetching data:', error);
       }
     };
-  
+
     fetchData();
   }, []);
 
-  useEffect(() => {
-    if (adminDetails.length) {
-      const updatedAdminDetails = adminDetails.map((admin) => {
-        const totalUsers = allUsers?.filter(
-          (user) => String(user.created_by_id) === String(admin.id)
-        ).length || 0;
-  
-        const totalProjects = allProjects?.filter(
-          (project) => String(project.created_by_id) === String(admin.id)
-        ).length || 0;
-  
-        return {
-          ...admin,
-          totalUsers,
-          totalProjects,
-        };
-      });
-  
-      setEnrichedAdminDetails(updatedAdminDetails);
-    }
-  }, [adminDetails, allUsers, allProjects]);
+  // useEffect(() => {
+  //   if (adminDetails.length) {
+  //     const updatedAdminDetails = adminDetails.map((admin) => {
+  //       const totalUsers = allUsers?.filter(
+  //         (user) => String(user.created_by_id) === String(admin.id)
+  //       ).length || 0;
+
+  //       const totalProjects = allProjects?.filter(
+  //         (project) => String(project.created_by_id) === String(admin.id)
+  //       ).length || 0;
+
+  //       return {
+  //         ...admin,
+  //         totalUsers,
+  //         totalProjects,
+  //       };
+  //     });
+
+  //     setEnrichedAdminDetails(updatedAdminDetails);
+  //   }
+  // }, [adminDetails, allUsers, allProjects]);
+
   // Fetch Total Admins
+
+  useEffect(() => {
+    setEnrichedAdminDetails(adminDetails);
+  }, [adminDetails]);
+
+
   useEffect(() => {
     const fetchTotalAdmins = async () => {
       try {
@@ -193,6 +202,7 @@ const DashBoard = () => {
         const response = await fetch(urls.userCount)
         if (response.ok) {
           const data = await response.json()
+          console.log("Total Users:", data);
           setTotalUsers(data.total_users)
         } else {
           console.error('Failed to fetch user count:', response.status, response.statusText)
@@ -265,7 +275,7 @@ const DashBoard = () => {
     return () => clearInterval(intervalId)
   }, [])
 
- return (
+  return (
     <Box sx={{ padding: 3 }}>
       <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap', justifyContent: 'center' }}>
         <WidgetsDropdown
@@ -337,41 +347,44 @@ const DashBoard = () => {
           />
         </Box>
         <TableContainer component={Paper}>
-  <Table>
-    <TableHead>
-      <TableRow>
-        <TableCell style={{ fontWeight: 'bold' }}>Sr No.</TableCell>
-        <TableCell style={{ fontWeight: 'bold' }}>Username</TableCell>
-        <TableCell style={{ fontWeight: 'bold' }}>Email</TableCell>
-        <TableCell style={{ fontWeight: 'bold' }}>Total Users</TableCell>
-        <TableCell style={{ fontWeight: 'bold' }}>Total Projects</TableCell>
-      </TableRow>
-    </TableHead>
-<TableBody>
-  
-  {enrichedAdminDetails
-    .filter((admin) =>
-      admin.username?.toLowerCase().includes(searchTerm.toLowerCase())
-    )
-    .map((admin, index) => (
-<TableRow 
-  key={admin.id} 
-  hover 
-  sx={{ cursor: 'pointer' }} 
-  onClick={() => navigate(`/dashboard/project_data`, { state: { admin } })}
->        <TableCell>{index + 1}</TableCell>
-        <TableCell>{admin.username || 'N/A'}</TableCell>
-        <TableCell>{admin.email || 'N/A'}</TableCell>
-        <TableCell>{admin.totalUsers || 0}</TableCell>
-        <TableCell>{admin.totalProjects || 0 }</TableCell>
-      </TableRow>
-    ))}
-</TableBody>
+          <Table>
+            <TableHead>
+              <TableRow>
+                <TableCell style={{ fontWeight: 'bold' }}>Sr No.</TableCell>
+                <TableCell style={{ fontWeight: 'bold' }}>Username</TableCell>
+                <TableCell style={{ fontWeight: 'bold' }}>Email</TableCell>
+                <TableCell style={{ fontWeight: 'bold' }}>Total Users</TableCell>
+                <TableCell style={{ fontWeight: 'bold' }}>Total Projects</TableCell>
+              </TableRow>
+            </TableHead>
+            <TableBody>
+
+              {enrichedAdminDetails
+                .filter((admin) =>
+                  admin.username?.toLowerCase().includes(searchTerm.toLowerCase())
+                )
+                .map((admin, index) => (
+                  <TableRow
+                    key={admin.id}
+                    hover
+                    sx={{ cursor: 'pointer' }}
+                    onClick={() => {
+                      console.log("Selected Admin ID:", admin.id);
+                      navigate(`/dashboard/project_data`, { state: { adminId: admin.id } });
+                    }}
+                  >        <TableCell>{index + 1}</TableCell>
+                    <TableCell>{admin.username || 'N/A'}</TableCell>
+                    <TableCell>{admin.email || 'N/A'}</TableCell>
+                    <TableCell>{admin.totalUsers || 0}</TableCell>
+                    <TableCell>{admin.totalProjects || 0}</TableCell>
+                  </TableRow>
+                ))}
+            </TableBody>
 
 
 
-  </Table>
-</TableContainer>
+          </Table>
+        </TableContainer>
 
 
       </Box>

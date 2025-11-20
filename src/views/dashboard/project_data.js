@@ -1,154 +1,316 @@
 import React, { useEffect, useState } from "react";
 import {
-  Box,
-  Table,
-  TableBody,
-  TableCell,
-  TableContainer,
-  TableHead,
-  TableRow,
-  Paper,
-  Typography,
-  TextField,
-  Card,
-  CardContent,
-  Link,
-  IconButton
+  Box, Table, TableBody, TableCell, TableContainer, TableHead, TableRow,
+  Paper, Typography, TextField, Card, CardContent, Link, IconButton
 } from "@mui/material";
-import { useNavigate } from "react-router-dom";
+import { data, useLocation, useNavigate } from "react-router-dom";
 import axios from "axios";
 import dayjs from "dayjs";
+import relativeTime from "dayjs/plugin/relativeTime";
 import { useTheme } from "@mui/material/styles";
-import { X } from "lucide-react";
-import { House } from "lucide-react";
-import GoogleMapReact from "google-map-react";
+import { Devices, CloudUpload, DynamicFeed, Error } from "@mui/icons-material";
+
 import urls from "../../urls/urls";
+import ProjectDataCard from "../widgets/project_data_card";
+import ProjectValueCard from "../widgets/project_value_card";
+import projecticon from "../../assets/images/projecticon.svg";
+import ProjectChart from "./PMGraphs/ProjectChart";
 import DeployGateway from "./DeployGateway";
+import GoogleMapReact from "google-map-react";
+import { House, X } from "lucide-react";
+import { getUserIdFromLocalStorage } from "../../data/localStorage";
 
 
-// 🔹 HouseMarker Component
-const HouseMarker = ({ text, alertStatus, warningStatus, gatewayData }) => {
+const HouseMarker = ({ lat, lng, text, alertStatus, warningStatus, arm, gatewayData }) => {
   const [showPopup, setShowPopup] = useState(false);
-  const [location, setLocation] = useState("");
-  const [houseNumber, setHouseNumber] = useState("");
+  const [address, setAddress] = useState("");
+  const [isBlinking, setIsBlinking] = useState(false);
+  const [markerAddress, setMarkerAddress] = useState(""); // Separate address state per marker
 
+  // console.log("🔔 Alert Status:", alertStatus, "Type:", typeof alertStatus);
+  // console.log("⚠️ Warning Status:", warningStatus, "Type:", typeof warningStatus);
+  // console.log("🏠 Gateway Data:", gatewayData);
+
+  // Determine color and blinking based on status
   let color = "green";
-  if (alertStatus === "1" || alertStatus === 1) color = "red";
-  else if (warningStatus === "1" || warningStatus === 1) color = "orange";
+  let shouldBlink = false;
 
-  // 🔹 Fetch address from OpenStreetMap
+  if (alertStatus === true || alertStatus === "true" || alertStatus === "1" || alertStatus === 1) {
+    color = "red";
+    shouldBlink = true;
+    // console.log("🚨 RED ALERT - Blinking activated");
+  } else if (warningStatus === true || warningStatus === "true" || warningStatus === "1" || warningStatus === 1) {
+    color = "orange";
+    shouldBlink = true;
+    // console.log("🟠 WARNING - Blinking activated");
+  }
+
+  // console.log("🎨 Final Color:", color, "Blinking:", shouldBlink);
+
+  // Handle blinking effect
   useEffect(() => {
-    if (gatewayData?.Lat_Log) {
-      const [lat, lng] = gatewayData.Lat_Log;
+    let blinkInterval;
+    if (shouldBlink) {
+      blinkInterval = setInterval(() => {
+        setIsBlinking(prev => !prev);
+      }, 1000);
+    } else {
+      setIsBlinking(false);
+    }
 
-      axios
-        .get(
-          `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json`
-        )
+    return () => {
+      if (blinkInterval) clearInterval(blinkInterval);
+    };
+  }, [shouldBlink]);
+
+  // Fetch address for THIS specific marker - FIXED: using individual state
+  useEffect(() => {
+    if (gatewayData?.latitude && gatewayData?.longitude) {
+      const lat = parseFloat(gatewayData.latitude);
+      const lng = parseFloat(gatewayData.longitude);
+      // console.log(`🛰️ Fetching address for ${gatewayData.gateway_name}:`, lat, lng);
+
+      axios.get(
+        `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json`
+      )
         .then((res) => {
-          const data = res.data;
-          setLocation(data.display_name || "Location not found");
-
-          // Extract house number if available
-          const house = data.address?.house_number || data.address?.building || "";
-          setHouseNumber(house);
+          setMarkerAddress(res.data.display_name);
+          // console.log(`📍 Address for ${gatewayData.gateway_name}:`, res.data.display_name);
         })
-        .catch(() => {
-          setLocation("Location not found");
-          setHouseNumber("");
+        .catch((error) => {
+          console.error(`❌ Error fetching address for ${gatewayData.gateway_name}:`, error);
+          setMarkerAddress("Address not found");
         });
+    } else if (gatewayData?.address) {
+      // Use existing address if available
+      setMarkerAddress(gatewayData.address);
     }
   }, [gatewayData]);
 
   return (
     <div
       style={{
-        transform: "translate(-50%, -100%)",
-        textAlign: "center",
-        position: "relative",
+        position: 'absolute',
+        transform: 'translate(-50%, -100%)',
+        textAlign: 'center',
       }}
     >
-      {/* 🏠 House Icon */}
-      <div onClick={() => setShowPopup(!showPopup)} style={{ cursor: "pointer" }}>
+      {/* Enhanced Marker Icon with Blinking */}
+      <div
+        onClick={() => setShowPopup(!showPopup)}
+        style={{
+          cursor: "pointer",
+          transition: "all 0.3s ease",
+          transform: showPopup ? "scale(1.1)" : "scale(1)",
+          opacity: isBlinking ? 0.3 : 1,
+        }}
+      >
         <House
           size={32}
           style={{
             color: color,
-            fill: color,
-            stroke: "gray",
-            strokeWidth: 1.5,
-            filter: "drop-shadow(0px 0px 4px rgba(0,0,0,0.5))",
+            fill: isBlinking ? "#ffffff" : color,
+            stroke: color,
+            strokeWidth: 2,
+            filter: `
+              drop-shadow(0px 2px 8px rgba(0,0,0,0.3))
+              ${showPopup ? "brightness(1.2)" : ""}
+            `,
+            transition: "all 0.3s ease",
           }}
         />
+        {/* Status indicator badge */}
+        {(alertStatus === true || warningStatus === true) && (
+          <div
+            style={{
+              position: "absolute",
+              top: "-5px",
+              right: "-5px",
+              width: "12px",
+              height: "12px",
+              borderRadius: "50%",
+              backgroundColor: color,
+              border: "2px solid white",
+              animation: shouldBlink ? "pulse 1s infinite" : "none",
+            }}
+          />
+        )}
         <div
-          style={{ fontSize: "14px", fontWeight: "bold", marginTop: "4px" }}
+          style={{
+            fontSize: "14px",
+            fontWeight: "700",
+            marginTop: "4px",
+            background: "linear-gradient(135deg, #2c3e50, #34495e)",
+            WebkitBackgroundClip: "text",
+            WebkitTextFillColor: "transparent",
+            textShadow: "0 1px 2px rgba(255,255,255,0.1)"
+          }}
         >
           {text}
         </div>
       </div>
 
-      {/* 🧾 Popup Info */}
+      {/* Enhanced Popup with Individual Data - FIXED: using markerAddress */}
       {showPopup && (
         <Card
           sx={{
             position: "absolute",
-            top: "-240px",
+            top: "-200px",
             left: "50%",
             transform: "translateX(-50%)",
-            width: 280,
-            borderRadius: "8px",
-            boxShadow: 4,
-            background: "#fff",
-            zIndex: 100,
+            width: 320,
+            borderRadius: "12px",
+            boxShadow: "0 8px 32px rgba(0,0,0,0.2)",
+            background: "linear-gradient(145deg, #ffffff, #f8f9fa)",
+            backdropFilter: "blur(10px)",
+            border: "1px solid rgba(255,255,255,0.2)",
+            zIndex: 1000,
+            overflow: "hidden",
+            '&:before': {
+              content: '""',
+              position: "absolute",
+              top: 0,
+              left: 0,
+              right: 0,
+              height: "4px",
+              background: `linear-gradient(90deg, ${color}, #3498db)`,
+            }
           }}
         >
-          <CardContent sx={{ p: 2, position: "relative" }}>
-            {/* Close button */}
+          <CardContent sx={{ p: 2.5, position: "relative" }}>
             <IconButton
               size="small"
               onClick={() => setShowPopup(false)}
-              sx={{ position: "absolute", top: 5, right: 5 }}
+              sx={{
+                position: "absolute",
+                top: 8,
+                right: 8,
+                background: "rgba(0,0,0,0.05)",
+                '&:hover': {
+                  background: "rgba(0,0,0,0.1)",
+                  transform: "rotate(90deg)"
+                },
+                transition: "all 0.3s ease",
+                width: 28,
+                height: 28
+              }}
             >
-              <X size={16} />
+              <X size={14} />
             </IconButton>
 
-            <Typography variant="h6" fontWeight={700} gutterBottom>
-              {gatewayData?.gateway_name || "Gateway"}
-            </Typography>
+            {/* Header with Status Icon */}
+            <Box sx={{ display: "flex", alignItems: "center", mb: 2 }}>
+              <Box
+                sx={{
+                  width: 12,
+                  height: 12,
+                  borderRadius: "50%",
+                  backgroundColor: color,
+                  mr: 1.5,
+                  animation: shouldBlink ? "pulse 1s infinite" : "none",
+                }}
+              />
+              <Typography
+                variant="h6"
+                fontWeight={800}
+                sx={{
+                  background: "linear-gradient(135deg, #2c3e50, #3498db)",
+                  WebkitBackgroundClip: "text",
+                  WebkitTextFillColor: "transparent",
+                  flex: 1
+                }}
+              >
+                {gatewayData?.gateway_name || "Gateway"}
+              </Typography>
+            </Box>
 
-            {/* ✅ House Number */}
-            <Typography variant="body2" fontWeight={600}>
-              🏠 House: {gatewayData?.address || houseNumber || "Not available"}
-            </Typography>
+            {/* Status Alert Banner */}
+            <Box
+              sx={{
+                background:
+                  alertStatus === true
+                    ? "linear-gradient(135deg, #e74c3c, #c0392b)"
+                    : warningStatus === true
+                      ? "linear-gradient(135deg, #f39c12, #e67e22)"
+                      : "linear-gradient(135deg, #27ae60, #219a52)",
+                color: "white",
+                padding: "8px 12px",
+                borderRadius: "8px",
+                mb: 2,
+                textAlign: "center",
+                fontWeight: 700,
+                fontSize: "14px",
+                animation: shouldBlink ? "pulse 2s infinite" : "none",
+              }}
+            >
+              {alertStatus === true
+                ? "🚨 ALERT TRIGGERED"
+                : warningStatus === true
+                  ? "⚠️ WARNING ACTIVE"
+                  : "✅ ALL SYSTEMS NORMAL"}
+            </Box>
 
-            {/* ✅ Full Location */}
-            <Typography variant="body2" sx={{ mt: 1 }}>
-              📍 Location: {location}
-            </Typography>
+            {/* Address - FIXED: using markerAddress instead of shared address */}
+            {markerAddress && (
+              <Box sx={{ display: "flex", alignItems: "center", mb: 1 }}>
+                <Box sx={{ mr: 1, fontSize: "16px" }}>🏠</Box>
+                <Typography variant="body2" fontWeight={600} color="primary.main">
+                  {markerAddress}
+                </Typography>
+              </Box>
+            )}
 
-            <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
-              MAC: {gatewayData?.gateway_mac}
-            </Typography>
+            {/* Technical Details */}
+            <Box sx={{
+              background: "rgba(0,0,0,0.02)",
+              borderRadius: "6px",
+              p: 1.5,
+              mt: 1.5,
+              border: "1px solid rgba(0,0,0,0.05)"
+            }}>
+              <Typography variant="body2" color="text.secondary" fontFamily="monospace">
+                MAC: {gatewayData?.mac_address}
+              </Typography>
 
-            <Typography variant="body2">
-              Status:{" "}
-              {alertStatus === "1" || alertStatus === 1
-                ? "🚨 Alert"
-                : warningStatus === "1" || warningStatus === 1
-                ? "⚠️ Warning"
-                : "✅ Normal"}
-            </Typography>
+              {/* Detailed Status Info */}
+              <Box sx={{ mt: 1 }}>
+                <Typography variant="caption" fontWeight={600} color="text.secondary">
+                  Alert: {alertStatus === true ? "ACTIVE 🚨" : "INACTIVE"}
+                </Typography>
+                <br />
+                <Typography variant="caption" fontWeight={600} color="text.secondary">
+                  Warning: {warningStatus === true ? "ACTIVE ⚠️" : "INACTIVE"}
+                </Typography>
+              </Box>
+            </Box>
 
-            {/* Google Maps Link */}
-            {gatewayData?.Lat_Log && (
+            {/* Google Maps CTA - FIXED: using correct coordinates */}
+            {gatewayData?.latitude && gatewayData?.longitude && (
               <Link
-                href={`https://www.google.com/maps?q=${gatewayData.Lat_Log[1]},${gatewayData.Lat_Log[0]}`}
+                href={`https://www.google.com/maps?q=${gatewayData.latitude},${gatewayData.longitude}`}
                 target="_blank"
                 rel="noopener"
-                underline="hover"
-                sx={{ display: "block", mt: 1 }}
+                underline="none"
+                sx={{
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  mt: 2,
+                  p: 1,
+                  background: "linear-gradient(135deg, #4285f4, #34a853)",
+                  color: "white",
+                  borderRadius: "8px",
+                  fontWeight: 600,
+                  fontSize: "14px",
+                  transition: "all 0.3s ease",
+                  '&:hover': {
+                    transform: "translateY(-1px)",
+                    boxShadow: "0 4px 12px rgba(66, 133, 244, 0.4)",
+                    background: "linear-gradient(135deg, #3367d6, #2e8b57)"
+                  }
+                }}
               >
-                🌍 View on Google Maps
+                🗺️ View on Google Maps
               </Link>
             )}
           </CardContent>
@@ -159,26 +321,42 @@ const HouseMarker = ({ text, alertStatus, warningStatus, gatewayData }) => {
 };
 
 
-// 🔹 ProjectData Component
+
+
 const ProjectData = () => {
   const theme = useTheme();
   const navigate = useNavigate();
+  const location = useLocation();
+  // const adminId = location.state?.adminId; // 👈 Get the passed ID
+  // console.log("Received Admin ID:", adminId);
+  const locationAdminId = location.state?.adminId;
+  const adminId = locationAdminId || getUserIdFromLocalStorage();
 
+  console.log("🧠 Selected Admin ID:", locationAdminId);
+  console.log("🧠 Fallback User ID (if adminId missing):", getUserIdFromLocalStorage());
+  console.log("✅ Final Used ID:", adminId);
   const [connectedGateways, setConnectedGateways] = useState([]);
+  console.log("final gateway with adreess ", connectedGateways);
+
   const [userId, setUserId] = useState("");
   const [role, setRole] = useState("");
   const [gatewayData, setGatewayData] = useState(null);
+  const [lastUpdatedRowId, setLastUpdatedRowId] = useState(null);
+  const [updated, setUpdated] = useState([]);
+  console.log("updated time", updated);
 
-  // Default map position
+  dayjs.extend(relativeTime);
+
+
   const defaultProps = {
     center: {
-      lat: 24.840,
-      lng: 67.159
+      lat: 31.5497,
+      lng: 74.3436
     },
     zoom: 6
   };
 
-  // Load user info
+  // Load user info from localStorage
   useEffect(() => {
     const storedUser = JSON.parse(localStorage.getItem("user"));
     if (storedUser) {
@@ -187,73 +365,121 @@ const ProjectData = () => {
     }
   }, []);
 
-  // 🔹 Fetch Gateway Data Every 5 Seconds
-  useEffect(() => {
-    let intervalId;
+  // const savedGateways = getGatewaysFromLocalStorage();
+  // console.log("Saved Gateways:", savedGateways);
 
-    const fetchGatewayData = async () => {
-      try {
-        const response = await axios.get(
-          `https://hat-server-382170497486.us-central1.run.app/getgateway/?gateway_id=12&mac=12:04:05:30:40:53`
-        );
+  // last time when the gateway data update or change 
 
-        setGatewayData(response.data);
-        console.log("Updated gateway data:", response.data);
-      } catch (error) {
-        console.error("Error fetching single gateway:", error);
+  const getUpdatedGateway = (oldData, newData) => {
+    if (!oldData || !newData) return null;
+
+    for (let newRow of newData) {
+      const oldRow = oldData.find(r => r.G_id === newRow.G_id);
+      if (!oldRow) continue;
+
+      if (JSON.stringify(oldRow) !== JSON.stringify(newRow)) {
+        return newRow;
       }
-    };
+    }
+    return null;
+  };
 
-    fetchGatewayData();
-    intervalId = setInterval(fetchGatewayData, 5000);
-    return () => clearInterval(intervalId);
+  const globalTime = {
+    minutes: 10,
+  };
+
+  useEffect(() => {
+    const savedIds = JSON.parse(localStorage.getItem("gateway_ids"));
+
+    if (!savedIds || savedIds.length === 0) {
+      console.log("⚠ No Gateway IDs found in localStorage");
+      return;
+    }
+
+    autoPostUpdateTime(savedIds);
+
   }, []);
 
-  // 🔹 Fetch all connected gateways
+
+
+  const autoPostUpdateTime = async (gatewayIds) => {
+    try {
+      const minutes = globalTime.minutes;
+
+      const payload = {
+        gateway_ids: gatewayIds,
+        minutes: minutes,
+      };
+
+      console.log("⏳ Auto POST Payload:", payload);
+
+      const res = await axios.post(`${urls.checkLastUpdate}`, payload);
+
+      console.log("🔥 Auto POST Response:", res.data);
+      setUpdated(res.data.gateways);
+
+    } catch (error) {
+      console.error("❌ Auto POST Error:", error);
+    }
+  };
+
+
+
+
   useEffect(() => {
     if (!userId && role !== "admin") return;
 
     const fetchGateways = async () => {
       try {
         let response;
+        let data;
         if (role === "admin" || role === "superadmin") {
-          response = await axios.get(urls.getAllGateways);
-          console.log("Gateway API Response (admin):", response.data);
+          response = await axios.get(`${urls.totalGateways}?user_id=${adminId}`);
+          data = response.data.Gateways;
+
+          // SAVE FULL DATA
+          localStorage.setItem("gateways", JSON.stringify(data));
+          const gatewaySet = JSON.parse(localStorage.getItem("gateways"))
+          console.log("Saved Gateways in LocalStorage:", gatewaySet);
+
+          // SAVE ONLY G_id LIST
+          const onlyIds = data.map((g) => g.G_id);
+          localStorage.setItem("gateway_ids", JSON.stringify(onlyIds));
+
+          console.log("💾 Saved G_ids:", onlyIds);
+
+          console.log("new response admin", data);
         } else {
           response = await axios.get(`${urls.getUserGateways}?user_id=${userId}`);
-          console.log("Gateway API Response:", response.data);
+          data = response.data.gateways
+          console.log("new response user", data);
         }
-
-        if (response.data.success) {
-          setConnectedGateways(response.data.gateways || []);
-        } else {
-          setConnectedGateways([]);
+        setConnectedGateways(data);
+        if (role === "admin") {
+          const gatewaysWithLocation = data.filter(
+            (g) => g.latitude && g.longitude
+          );
+          setGatewayData(gatewaysWithLocation);
         }
       } catch (error) {
-        console.error("Error fetching gateways:", error);
+        console.error("❌ Error fetching gateways:", error);
         setConnectedGateways([]);
       }
     };
 
     fetchGateways();
+    const interval = setInterval(fetchGateways, 5000);
+    return () => clearInterval(interval);
   }, [userId, role]);
 
-  // Navigate to project manager
   const handleGatewayClick = (gateway) => {
-    navigate("/dashboard/project_manager", { state: { gateway } });
+    navigate("/dashboard/project_manager", { state: { gateway_id: gateway.G_id, gateway } });
   };
 
   return (
     <Box p={2}>
       {/* Header */}
-      <Box
-        sx={{
-          mb: 3,
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "center",
-        }}
-      >
+      <Box sx={{ mb: 3, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
         <Box>
           <Typography variant="h4" fontWeight={700}>Dashboard</Typography>
           <Typography variant="body1" fontWeight={700}>
@@ -275,15 +501,12 @@ const ProjectData = () => {
             mb: 2,
             p: "10px",
             borderRadius: "8px",
-            background:
-              theme.palette.mode === "dark"
-                ? "#2B344A"
-                : "linear-gradient(90deg, #5EACED 0%, #4089CA 100%)",
+            background: theme.palette.mode === "dark"
+              ? "#2B344A"
+              : "linear-gradient(90deg, #5EACED 0%, #4089CA 100%)"
           }}
         >
-          <Typography variant="h5" fontWeight={700} color="#fff">
-            Connected Gateways
-          </Typography>
+          <Typography variant="h5" fontWeight={700} color="#fff">Connected Gateways</Typography>
           <TextField
             placeholder="Search"
             size="small"
@@ -292,40 +515,61 @@ const ProjectData = () => {
           {role && (role === "user" || role === "admin") && <DeployGateway />}
         </Box>
 
-        {/* 🔹 Map (for Admin) */}
-        {role === "admin" && gatewayData && (
-          <div style={{ height: "500px", width: "100%", marginTop: "20px" }}>
+        {/* Map only for admin */}
+        {role === "admin" && gatewayData?.length > 0 && (
+          <div style={{ height: "500px", width: "100%", marginTop: "20px", position: "relative" }}>
             <GoogleMapReact
               bootstrapURLKeys={{ key: "AIzaSyAcp45sEfXq6mT19p51_LC8Goiv4ztUDnQ" }}
-              center={{
-                lat: parseFloat(gatewayData.Lat_Log[0]),
-                lng: parseFloat(gatewayData.Lat_Log[1]),
+              defaultCenter={{
+                lat: parseFloat(gatewayData[0]?.latitude),
+                lng: parseFloat(gatewayData[0]?.longitude),
               }}
-              zoom={8}
+              defaultZoom={8}
             >
-              <HouseMarker
-                lat={parseFloat(gatewayData.Lat_Log[0])}
-                lng={parseFloat(gatewayData.Lat_Log[1])}
-                text={gatewayData.gateway_name || "My Gateway"}
-                alertStatus={gatewayData.alert_status}
-                warningStatus={gatewayData.warning_status}
-                gatewayData={gatewayData}
-              />
+              {gatewayData.map((g) => {
+                const lat = parseFloat(g.latitude);
+                const lng = parseFloat(g.longitude);
+
+                if (isNaN(lat) || isNaN(lng)) {
+                  console.warn(`❌ Invalid coordinates for ${g.gateway_name}:`, g.latitude, g.longitude);
+                  return null;
+                }
+
+                return (
+                  <HouseMarker
+                    key={g.G_id}
+                    lat={lat}
+                    lng={lng}
+                    text={g.gateway_name}
+                    alertStatus={g.alert_status}
+                    warningStatus={g.warning_status}
+                    arm={g.arm}
+                    gatewayData={g}
+                  />
+                );
+              })}
             </GoogleMapReact>
           </div>
         )}
 
-        {/* 🔹 Gateway Table */}
-        <TableContainer component={Paper} sx={{ mt: 3 }}>
+
+        {role === "admin" && gatewayData?.length === 0 && (
+          <Typography mt={2} color="error">
+            No gateway with valid location found.
+          </Typography>
+        )}
+        <TableContainer component={Paper}>
           <Table>
             <TableHead>
               <TableRow sx={{ background: "#E8EAF6" }}>
                 <TableCell><b>ID</b></TableCell>
-                <TableCell><b>Name</b></TableCell>
+                <TableCell><b>Username</b></TableCell>
+                <TableCell><b>Gateway Name</b></TableCell>
                 <TableCell><b>MAC Address</b></TableCell>
                 <TableCell><b>Status</b></TableCell>
                 <TableCell><b>Deploy Status</b></TableCell>
-                <TableCell><b>Config</b></TableCell>
+                <TableCell><b>Address</b></TableCell>
+                <TableCell><b>Last Updated</b></TableCell>
               </TableRow>
             </TableHead>
             <TableBody>
@@ -334,14 +578,35 @@ const ProjectData = () => {
                   key={index}
                   hover
                   onClick={() => handleGatewayClick(gateway)}
-                  sx={{ cursor: "pointer" }}
+                  sx={{
+                    cursor: "pointer",
+                    backgroundColor:
+                      gateway.alert_status
+                        ? "#ffcccc" // 🔥 light red (alert)
+                        : gateway.warning_status
+                          ? "#ffe6b3" // ⚠️ light orange (warning)
+                          : "white", // normal
+                  }}
                 >
                   <TableCell>{gateway.G_id}</TableCell>
+                  <TableCell>{gateway.firstname || "N/A"}</TableCell>
                   <TableCell>{gateway.gateway_name}</TableCell>
                   <TableCell>{gateway.mac_address}</TableCell>
-                  <TableCell>{gateway.status ? "Offline" : "Online"}</TableCell>
+                  <TableCell>
+                    {gateway.status? (
+                      <span style={{ color: "green", fontWeight: 600 }}>● Online</span>
+                    ) : (
+                      <span style={{ color: "red", fontWeight: 600 }}>● Offline</span>
+                    )}
+                  </TableCell>
+
                   <TableCell>{gateway.deploy_status}</TableCell>
-                  <TableCell>{gateway.config ? "Not Configured" : "Configured"}</TableCell>
+                  <TableCell>{gateway.address || "N/A"}</TableCell>
+                  <TableCell>
+                    {gateway.last_updated
+                      ? dayjs(gateway.last_updated).fromNow()
+                      : "N/A"}
+                  </TableCell>
                 </TableRow>
               ))}
 
@@ -356,6 +621,9 @@ const ProjectData = () => {
           </Table>
         </TableContainer>
       </Box>
+
+
+
     </Box>
   );
 };
