@@ -3,7 +3,6 @@ import { getUserIdFromLocalStorage } from '../data/localStorage';
 
 const selectedGatewayId = localStorage.getItem("selectedGatewayId");
 
-
 // const API_Base_url = import.meta.env.VITE_API_BASE_URL || "http://127.0.0.1:8000";
 const API_Base_url = import.meta.env.VITE_API_BASE_URL || "http://192.168.18.28:8000";
 //const API_Base_url = import.meta.env.VITE_API_BASE_URL || "https://ems-server-530056698.us-central1.run.app" ;
